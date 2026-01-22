@@ -23,7 +23,7 @@ export default function Home() {
 						target="_blank"
 						rel="noopener noreferrer"
 					>
-						Read our docs
+						Read our Pradeep's docs
 					</a>
 				</div>
 			</main>
@@ -44,7 +44,7 @@ export default function Home() {
 					rel="noopener noreferrer"
 				>
 					<Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
-					Go to nextjs.org →
+					Go to maagnuskleid →
 				</a>
 			</footer>
 		</div>
