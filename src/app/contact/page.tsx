@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from "react-hook-form";
+import { useForm, UseFormRegisterReturn, FieldError } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { contactSchema, ContactFormValues } from "@/lib/schemas/contactval";
 
@@ -22,7 +22,7 @@ export default function ContactPage() {
       <section className="mx-auto max-w-225 px-8 py-32">
         <h1 className="mb-4 text-3xl font-light">Contact Us</h1>
         <p className="mb-20 max-w-md text-sm text-neutral-600">
-          Have a question about your order, sizing, or anything else?  
+          Have a question about your order, sizing, or anything else?
           Send us a message and our team will get back to you.
         </p>
 
@@ -93,15 +93,14 @@ export default function ContactPage() {
 /* ----------------------- */
 /* Input Component */
 /* ----------------------- */
-function Input({
-  label,
-  register,
-  error,
-}: {
+
+interface InputProps {
   label: string;
-  register: any;
-  error?: any;
-}) {
+  register: UseFormRegisterReturn;
+  error?: FieldError;
+}
+
+function Input({ label, register, error }: InputProps) {
   return (
     <div className="flex flex-col gap-2">
       <label className="text-[11px] tracking-[0.25em] text-neutral-500">

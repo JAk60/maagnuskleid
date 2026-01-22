@@ -86,7 +86,7 @@ export default function PrivacyPolicyPage() {
                   <h2 className="text-3xl md:text-4xl font-light tracking-tight">Our Commitment</h2>
                 </div>
                 <p className="text-xl leading-relaxed text-[#E3D9C6]/90 mb-4">
-                  We <strong className="text-[#E3D9C6]">strongly support our customers' privacy</strong> and their faith in us.
+                  We <strong className="text-[#E3D9C6]">strongly support our customers privacy</strong> and their faith in us.
                 </p>
                 <p className="text-lg leading-relaxed text-[#E3D9C6]/70">
                   We do not share, sell, or distribute your information to anyone. Your data is collected solely to serve you better and improve our services.
@@ -338,7 +338,7 @@ export default function PrivacyPolicyPage() {
             <div className="border border-[#E3D9C6]/20 p-10">
               <h3 className="text-2xl font-light mb-4">Questions About Privacy?</h3>
               <p className="text-[#E3D9C6]/70 mb-6 max-w-2xl mx-auto">
-                If you have any questions or concerns about how we handle your data, please don't hesitate to reach out to us.
+                If you have any questions or concerns about how we handle your data, please do not hesitate to reach out to us.
               </p>
               <Link
                 href="/"
@@ -361,7 +361,7 @@ export default function PrivacyPolicyPage() {
       >
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-sm text-[#E3D9C6]/40 tracking-wider">
-            © 2026 Maagnus Kleid. All rights reserved.
+            ©2026 Maagnus Kleid. All rights reserved.
           </p>
           <div className="flex gap-8">
             <Link

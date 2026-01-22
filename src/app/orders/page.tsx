@@ -2,12 +2,12 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
 import { useAuth } from "@/context/auth-context"
-import { Navbar } from "@/components/navbar"
 import { getOrders, type Order } from "@/lib/supabase-orders"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export default function OrdersPage() {
   const { isLoggedIn, user } = useAuth()
@@ -75,7 +75,7 @@ export default function OrdersPage() {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-xl text-muted-foreground mb-6">You haven't placed any orders yet</p>
+              <p className="text-xl text-muted-foreground mb-6">You have not placed any orders yet</p>
               <Link
                 href="/products"
                 className="inline-block px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold"
@@ -113,7 +113,7 @@ export default function OrdersPage() {
                   <div className="space-y-4 mb-6">
                     {order.items.map((item, index) => (
                       <div key={index} className="flex gap-4">
-                        <img
+                        <Image
                           src={item.product_image || "/placeholder.svg"}
                           alt={item.product_name}
                           className="w-20 h-20 object-cover rounded-lg"

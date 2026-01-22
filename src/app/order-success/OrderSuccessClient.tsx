@@ -1,18 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useSearchParams } from "next/navigation"
-import Link from "next/link"
-import {
-  CheckCircle,
-  Package,
-  Truck,
-  MapPin,
-  Calendar,
-  ArrowRight
-} from "lucide-react"
-import { getOrderById, type Order } from "@/lib/supabase-orders"
 import { useCart } from "@/context/cart-context"
+import { getOrderById, type Order } from "@/lib/supabase-orders"
+import {
+  ArrowRight,
+  Calendar,
+  CheckCircle,
+  MapPin,
+  Package
+} from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export default function OrderSuccessClient() {
   const searchParams = useSearchParams()
@@ -159,7 +159,7 @@ export default function OrderSuccessClient() {
             <div className="space-y-4 mb-6">
               {order.items.map((item, index) => (
                 <div key={index} className="flex gap-4">
-                  <img
+                  <Image
                     src={item.product_image || "/placeholder-product.jpg"}
                     alt={item.product_name}
                     className="w-20 h-20 object-cover rounded-lg"

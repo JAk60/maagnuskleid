@@ -1,14 +1,32 @@
-// app/checkout/page.tsx - UPDATED (Tax Inclusive)
+// app/checkout/page.tsx - FIXED
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/context/cart-context"
 import { useAuth } from "@/context/auth-context"
 import Link from "next/link"
 import { initializeRazorpay, openRazorpayCheckout } from "@/lib/razorpay"
 import { createOrder, getAddresses, createAddress, type Address } from "@/lib/supabase-orders"
+
+// Type definitions for API responses
+interface RazorpayOrderResponse {
+  success: boolean
+  order: {
+    id: string
+    amount: number
+    currency: string
+  }
+}
+
+interface VerifyPaymentResponse {
+  success: boolean
+}
+
+interface ErrorResponse {
+  error?: string
+}
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCart()
@@ -38,23 +56,25 @@ export default function CheckoutPage() {
   const shippingCost = 0
   const finalTotal = total + shippingCost
 
+  const loadAddresses = useCallback(async () => {
+    if (!user) return
+    
+    try {
+      const userAddresses = await getAddresses(user.id)
+      setAddresses(userAddresses)
+      const defaultAddr = userAddresses.find(addr => addr.is_default)
+      if (defaultAddr) setSelectedAddress(defaultAddr)
+    } catch (err) {
+      console.error("Failed to load addresses:", err)
+      setError("Failed to load saved addresses. You can still add a new one.")
+    }
+  }, [user])
+
   useEffect(() => {
     if (isLoggedIn && user) {
       loadAddresses()
     }
-  }, [isLoggedIn, user])
-
-  const loadAddresses = async () => {
-    try {
-      const userAddresses = await getAddresses(user!.id)
-      setAddresses(userAddresses)
-      const defaultAddr = userAddresses.find(addr => addr.is_default)
-      if (defaultAddr) setSelectedAddress(defaultAddr)
-    } catch (error) {
-      console.error("Failed to load addresses:", error)
-      setError("Failed to load saved addresses. You can still add a new one.")
-    }
-  }
+  }, [isLoggedIn, user, loadAddresses])
 
   const handleAddressFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
@@ -94,8 +114,8 @@ export default function CheckoutPage() {
         country: "India",
         is_default: false,
       })
-    } catch (error) {
-      console.error("Failed to save address:", error)
+    } catch (err) {
+      console.error("Failed to save address:", err)
       setError("Failed to save address. Please try again.")
     }
   }
@@ -177,17 +197,17 @@ export default function CheckoutPage() {
 
       // Handle rate limiting
       if (response.status === 429) {
-        const errorData = await response.json().catch(() => ({ error: "Too many attempts" }));
+        const errorData = await response.json().catch(() => ({ error: "Too many attempts" })) as ErrorResponse;
         throw new Error(errorData.error || "Too many payment attempts. Please try again in a few minutes.");
       }
 
       // Handle other errors
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as ErrorResponse;
         throw new Error(errorData.error || `Payment gateway error (${response.status})`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as RazorpayOrderResponse;
 
       if (!data.success || !data.order) {
         throw new Error("Invalid response from payment server");
@@ -232,7 +252,7 @@ export default function CheckoutPage() {
               throw new Error("Payment verification failed");
             }
 
-            const result = await verifyResponse.json();
+            const result = await verifyResponse.json() as VerifyPaymentResponse;
 
             if (result.success) {
               console.log("Payment verified successfully");
@@ -243,10 +263,11 @@ export default function CheckoutPage() {
             } else {
               setError(`Payment verification failed. Order ID: ${order.order_number}. Please contact support.`);
             }
-          } catch (verifyError: any) {
+          } catch (verifyError) {
+            const errorMessage = verifyError instanceof Error ? verifyError.message : "Unknown error occurred";
             console.error("Verification error:", verifyError);
             setError(
-              `Payment verification failed: ${verifyError.message}. Order ID: ${order.order_number}. ` +
+              `Payment verification failed: ${errorMessage}. Order ID: ${order.order_number}. ` +
               `Your payment may have been processed. Please contact support before retrying.`
             );
           } finally {
@@ -274,20 +295,21 @@ export default function CheckoutPage() {
           }
         }
       );
-    } catch (error: any) {
-      console.error("Order creation error:", error);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      console.error("Order creation error:", err);
       setLoading(false);
 
       // User-friendly error messages
-      if (error.message.includes("internet connection")) {
+      if (errorMessage.includes("internet connection")) {
         setError("Connection error. Please check your internet and try again.");
-      } else if (error.message.includes("Too many")) {
-        setError(error.message);
-      } else if (error.message.includes("rate limit") || error.message.includes("429")) {
+      } else if (errorMessage.includes("Too many")) {
+        setError(errorMessage);
+      } else if (errorMessage.includes("rate limit") || errorMessage.includes("429")) {
         setError("Too many attempts. Please wait a few minutes and try again.");
       } else {
         setError(
-          error.message ||
+          errorMessage ||
           "Failed to process order. Please try again or contact support."
         );
       }

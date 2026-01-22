@@ -1,18 +1,30 @@
-// app/products/[slug]/page.tsx - Complete code with vertical thumbnail gallery
+// app/products/[slug]/page.tsx - Fixed version with proper types
 
 'use client';
 
-import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useState } from 'react';
+import { Key, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Product } from '@/lib/types';
 import { getProducts } from '@/lib/supabase';
-import { formatPrice, generateSlug, generateCategorySlug, addSlugToProduct } from '@/utils/helpers';
+import { formatPrice, generateCategorySlug, addSlugToProduct } from '@/utils/helpers';
 import ProductCard from '@/components/products/ProductCard';
 import { ChevronLeft, Check, ShoppingCart, Plus, Minus, Ruler, X } from 'lucide-react';
 import { useCart } from '@/context/cart-context';
 import { toast } from 'react-hot-toast';
+
+// Type definitions for color handling
+type ColorValue = string | { name?: string; hex: string };
+
+interface SizeChartEntry {
+    size: string;
+    chest?: number;
+    length?: number;
+    bust?: number;
+    length_female?: number;
+    notes?: string;
+}
 
 export default function ProductDetailPage() {
     const params = useParams();
@@ -98,7 +110,7 @@ export default function ProductDetailPage() {
         setQuantity(newQuantity);
     };
 
-    const handleColorChange = (color: any) => {
+    const handleColorChange = (color: ColorValue) => {
         const colorValue = typeof color === 'string'
             ? color
             : (color && typeof color === 'object' && 'hex' in color)
@@ -166,7 +178,7 @@ export default function ProductDetailPage() {
         }, 600);
     };
 
-    const getColorHex = (color: any): string => {
+    const getColorHex = (color: ColorValue): string => {
         if (typeof color === 'string') {
             return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
         } else if (color && typeof color === 'object' && 'hex' in color) {
@@ -175,7 +187,7 @@ export default function ProductDetailPage() {
         return '#000000';
     };
 
-    const getColorValue = (color: any): string => {
+    const getColorValue = (color: ColorValue): string => {
         if (typeof color === 'string') {
             return color;
         } else if (color && typeof color === 'object' && 'hex' in color) {
@@ -184,7 +196,7 @@ export default function ProductDetailPage() {
         return 'Unknown';
     };
 
-    const getColorName = (color: any): string => {
+    const getColorName = (color: ColorValue): string => {
         if (typeof color === 'string') {
             return color;
         } else if (color && typeof color === 'object') {
@@ -369,7 +381,7 @@ export default function ProductDetailPage() {
                         <div>
                             <label className="block text-sm font-medium mb-3">
                                 Color: <span className="font-normal text-gray-600">
-                                    {getColorName(product.colors.find(c => getColorValue(c) === selectedColor))}
+                                    {getColorName(product.colors.find(c => getColorValue(c) === selectedColor) || selectedColor)}
                                 </span>
                             </label>
                             <div className="flex flex-wrap gap-3">
@@ -551,18 +563,18 @@ export default function ProductDetailPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {product.size_chart.map((chart: { size: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; chest: any; length: any; bust: any; length_female: any; notes: any; }, index: Key | null | undefined) => (
+                                        {(product.size_chart as SizeChartEntry[]).map((chart, index: Key) => (
                                             <tr key={index} className="hover:bg-gray-50">
                                                 <td className="border border-gray-300 px-4 py-3 font-semibold">{chart.size}</td>
                                                 {product.gender === 'Male' ? (
                                                     <>
-                                                        <td className="border border-gray-300 px-4 py-3">{chart.chest || '-'}"</td>
-                                                        <td className="border border-gray-300 px-4 py-3">{chart.length || '-'}"</td>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.chest || '-'}&quot;</td>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.length || '-'}&quot;</td>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="border border-gray-300 px-4 py-3">{chart.bust || '-'}"</td>
-                                                        <td className="border border-gray-300 px-4 py-3">{chart.length_female || '-'}"</td>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.bust || '-'}&quot;</td>
+                                                        <td className="border border-gray-300 px-4 py-3">{chart.length_female || '-'}&quot;</td>
                                                     </>
                                                 )}
                                             </tr>

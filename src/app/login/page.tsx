@@ -1,4 +1,3 @@
-// app/login/page.tsx
 "use client"
 
 import type React from "react"
@@ -14,50 +13,51 @@ export default function LoginPage() {
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+
   const { login, signup } = useAuth()
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      // Check if it's an admin email
-      const isAdminEmail = email.toLowerCase().includes("@maagnuskleid.com") || 
-                          email.toLowerCase() === "admin@maagnuskleid.com"
+      const isAdminEmail =
+        email.toLowerCase().includes("@maagnuskleid.com") ||
+        email.toLowerCase() === "admin@maagnuskleid.com"
 
       if (isAdminEmail) {
-        // Try admin login
         try {
           const { admin, token, expiresAt } = await adminLogin(email, password)
-          
-          // Store admin session
+
           localStorage.setItem("admin_token", token)
           localStorage.setItem("admin_user", JSON.stringify(admin))
           localStorage.setItem("admin_expires", expiresAt.toISOString())
-          
-          // Redirect to admin dashboard
+
           router.push("/admin/dashboard")
           return
-        } catch (adminError: any) {
-          // If admin login fails, show error
+        } catch {
           setError("Invalid admin credentials")
           setIsLoading(false)
           return
         }
       }
 
-      // Regular user login/signup
       if (isSignup) {
         await signup(email, password, name)
         alert("Account created! Please check your email to confirm.")
       } else {
         await login(email, password)
       }
+
       router.push("/")
-    } catch (err: any) {
-      setError(err.message || "An error occurred")
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("An unexpected error occurred")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -68,7 +68,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="border border-border rounded-xl p-8 space-y-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold mb-2">{isSignup ? "Create Account" : "Welcome Back"}</h1>
+            <h1 className="text-3xl font-bold mb-2">
+              {isSignup ? "Create Account" : "Welcome Back"}
+            </h1>
             <p className="text-muted-foreground">
               {isSignup ? "Join genzquicks today" : "Sign in to your account"}
             </p>
@@ -83,7 +85,9 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (
               <div>
-                <label className="block text-sm font-medium mb-2">Full Name</label>
+                <label className="block text-sm font-medium mb-2">
+                  Full Name
+                </label>
                 <input
                   type="text"
                   value={name}
@@ -113,7 +117,9 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
+              <label className="block text-sm font-medium mb-2">
+                Password
+              </label>
               <input
                 type="password"
                 value={password}
@@ -123,7 +129,11 @@ export default function LoginPage() {
                 required
                 minLength={6}
               />
-              {isSignup && <p className="text-xs text-muted-foreground mt-1">Minimum 6 characters</p>}
+              {isSignup && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Minimum 6 characters
+                </p>
+              )}
             </div>
 
             <button
@@ -131,7 +141,11 @@ export default function LoginPage() {
               disabled={isLoading}
               className="w-full py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Loading..." : isSignup ? "Create Account" : "Sign In"}
+              {isLoading
+                ? "Loading..."
+                : isSignup
+                ? "Create Account"
+                : "Sign In"}
             </button>
           </form>
 
@@ -153,10 +167,11 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Admin Login Info */}
           <div className="pt-4 border-t border-border">
             <p className="text-xs text-center text-muted-foreground">
-              💡 Tip: Use your <span className="font-semibold">@maagnuskleid.com</span> email to access admin panel
+              💡 Tip: Use your{" "}
+              <span className="font-semibold">@maagnuskleid.com</span> email to
+              access admin panel
             </p>
           </div>
         </div>
