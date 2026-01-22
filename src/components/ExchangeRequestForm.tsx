@@ -16,8 +16,8 @@ interface OrderItem {
 }
 
 interface Order {
-  id: string;
-  user_id: string;
+  id?: string;  // ✅ CHANGED: Made optional to match supabase-orders type
+  user_id?: string;  // ✅ CHANGED: Made optional to match supabase-orders type
   items: OrderItem[];
 }
 
@@ -69,6 +69,16 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
   };
 
   const checkEligibility = useCallback(async () => {
+    // ✅ ADDED: Guard clause for missing IDs
+    if (!order.id || !order.user_id) {
+      setEligibility({ 
+        eligible: false, 
+        reason: 'Invalid order data' 
+      });
+      setCheckingEligibility(false);
+      return;
+    }
+
     try {
       const response = await fetch(
         `/api/exchanges/eligibility?orderId=${order.id}&userId=${order.user_id}`
@@ -91,6 +101,12 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
   }, [checkEligibility]);
 
   const handleSubmit = async () => {
+    // ✅ ADDED: Guard clause for missing IDs
+    if (!order.id || !order.user_id) {
+      alert('Invalid order data');
+      return;
+    }
+
     if (!selectedItem) {
       alert('Please select an item to exchange');
       return;

@@ -362,7 +362,7 @@ export async function updateOrderPayment(
 }
 
 export async function updateOrderStatus(orderId: string, status: Order['order_status']) {
-  const updates: any = {
+  const updates: Partial<Order> & { updated_at: string } = {
     order_status: status,
     updated_at: new Date().toISOString(),
   };

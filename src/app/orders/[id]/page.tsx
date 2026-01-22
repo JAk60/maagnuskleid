@@ -15,6 +15,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react"
 import ExchangeRequestForm from "@/components/ExchangeRequestForm"
+import Image from "next/image"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -25,7 +26,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [showExchangeForm, setShowExchangeForm] = useState(false) // ✅ NEW
+  const [showExchangeForm, setShowExchangeForm] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -69,17 +70,17 @@ export default function OrderDetailPage() {
     }
   }
 
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    confirmed: "bg-blue-100 text-blue-800",
-    processing: "bg-purple-100 text-purple-800",
-    shipped: "bg-indigo-100 text-indigo-800",
-    delivered: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800",
+      processing: "bg-purple-100 text-purple-800",
+      shipped: "bg-indigo-100 text-indigo-800",
+      delivered: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
+    }
+    return colors[status] || "bg-gray-100 text-gray-800"
   }
-  return colors[status] || "bg-gray-100 text-gray-800"
-}
 
   const getPaymentStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -287,9 +288,11 @@ const getStatusColor = (status: string) => {
                     key={index}
                     className="flex gap-4 pb-4 border-b border-border last:border-0"
                   >
-                    <img
+                    <Image
                       src={item.product_image || "/placeholder.svg"}
                       alt={item.product_name}
+                      width={80}
+                      height={80}
                       className="w-20 h-20 object-cover rounded-lg"
                     />
 
@@ -314,25 +317,34 @@ const getStatusColor = (status: string) => {
               </div>
             </div>
 
-            {/* NEW: Exchange Button + Form */}
-            {order.order_status === "delivered" && (
-              <button
-                onClick={() => setShowExchangeForm(!showExchangeForm)}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center justify-center gap-2"
-              >
-                <ArrowLeftRight className="w-5 h-5" />
-                Request Exchange
-              </button>
-            )}
+            {/* ✅ FIXED: Exchange Button + Form with type guard */}
+            {order.order_status === "delivered" && order.id && order.user_id && (
+              <>
+                <button
+                  onClick={() => setShowExchangeForm(!showExchangeForm)}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center justify-center gap-2"
+                >
+                  <ArrowLeftRight className="w-5 h-5" />
+                  Request Exchange
+                </button>
 
-            {showExchangeForm && (
-              <div className="border border-border rounded-lg p-6 mt-4">
-                <ExchangeRequestForm
-                  order={order}
-                  onClose={() => setShowExchangeForm(false)}
-                  onSuccess={() => setShowExchangeForm(false)}
-                />
-              </div>
+                {showExchangeForm && (
+                  <div className="border border-border rounded-lg p-6 mt-4">
+                    <ExchangeRequestForm
+                      order={{
+                        id: order.id,
+                        user_id: order.user_id,
+                        items: order.items.map(item => ({
+                          ...item,
+                          product_id: String(item.product_id)
+                        }))
+                      }}
+                      onClose={() => setShowExchangeForm(false)}
+                      onSuccess={() => setShowExchangeForm(false)}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
