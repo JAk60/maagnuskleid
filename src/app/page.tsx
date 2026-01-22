@@ -23,7 +23,7 @@ export default function Home() {
 						target="_blank"
 						rel="noopener noreferrer"
 					>
-						Read our Pradeep's docs
+						Read our Pradeeps docs
 					</a>
 				</div>
 			</main>
