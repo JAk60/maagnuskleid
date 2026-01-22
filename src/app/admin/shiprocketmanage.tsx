@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -6,15 +6,17 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+interface ShippingAddress {
+    first_name: string;
+    last_name: string;
+    city: string;
+}
+
 interface Order {
     id: string;
     order_number: string;
     created_at: string;
-    shipping_address?: {
-        first_name: string;
-        last_name: string;
-        city: string;
-    };
+    shipping_address?: ShippingAddress;
     total: number;
     order_status: string;
     payment_status: string;
@@ -24,18 +26,18 @@ interface Order {
     pickup_scheduled_date?: string;
 }
 
+interface ShipRocketActionResponse {
+    success: boolean;
+    error?: string;
+}
+
 export default function ShipRocketManagement() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedOrder, setSelectedOrder] = useState(null);
     const [processing, setProcessing] = useState(false);
     const [filter, setFilter] = useState('all');
 
-    useEffect(() => {
-        fetchOrders();
-    }, [filter]);
-
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
             let query = supabase
@@ -59,7 +61,11 @@ export default function ShipRocketManagement() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filter]);
+
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
 
     const handleAction = async (orderId: string, action: string) => {
         setProcessing(true);
@@ -70,7 +76,7 @@ export default function ShipRocketManagement() {
                 body: JSON.stringify({ orderId, action }),
             });
 
-            const result = await response.json();
+            const result = await response.json() as ShipRocketActionResponse;
 
             if (!response.ok) {
                 throw new Error(result.error || 'Action failed');

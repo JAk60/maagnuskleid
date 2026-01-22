@@ -1,26 +1,52 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import {
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  IndianRupee,
   Package,
   ShoppingCart,
-  Users,
-  IndianRupee,
-  TrendingUp,
-  AlertTriangle,
-  Clock,
-  CheckCircle
+  Users
 } from 'lucide-react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+/* ---------- Types ---------- */
+
+interface LowStockProduct {
+  id: string;
+  name: string;
+  image_url?: string;
+  price: number;
+  stock: number;
+}
+
+interface RecentOrder {
+  id: string;
+  orderNumber: string;
+  customer: string;
+  status: string;
+  paymentStatus: string;
+  amount: number;
+  date: string;
+}
 
 interface Stats {
   totalProducts: number;
   totalOrders: number;
   totalCustomers: number;
   totalRevenue: number;
-  lowStockProducts: any[];
-  recentOrders: any[];
+  lowStockProducts: LowStockProduct[];
+  recentOrders: RecentOrder[];
 }
+
+interface StatsApiResponse {
+  success: boolean;
+  data: Stats;
+  error?: string;
+}
+
+/* ---------- Component ---------- */
 
 export default function DashboardOverview() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -33,10 +59,18 @@ export default function DashboardOverview() {
   const fetchStats = async () => {
     try {
       const response = await fetch('/api/admin/stats');
-      const data = await response.json();
-      if (data.success) {
-        setStats(data.data);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
       }
+
+      const data = (await response.json()) as StatsApiResponse;
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch stats');
+      }
+
+      setStats(data.data);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     } finally {
@@ -60,7 +94,6 @@ export default function DashboardOverview() {
       title: 'Total Products',
       value: stats?.totalProducts || 0,
       icon: Package,
-      color: 'bg-blue-500',
       textColor: 'text-blue-600',
       bgColor: 'bg-blue-50'
     },
@@ -68,7 +101,6 @@ export default function DashboardOverview() {
       title: 'Total Orders',
       value: stats?.totalOrders || 0,
       icon: ShoppingCart,
-      color: 'bg-green-500',
       textColor: 'text-green-600',
       bgColor: 'bg-green-50'
     },
@@ -76,7 +108,6 @@ export default function DashboardOverview() {
       title: 'Total Customers',
       value: stats?.totalCustomers || 0,
       icon: Users,
-      color: 'bg-purple-500',
       textColor: 'text-purple-600',
       bgColor: 'bg-purple-50'
     },
@@ -84,57 +115,48 @@ export default function DashboardOverview() {
       title: 'Total Revenue',
       value: `₹${(stats?.totalRevenue || 0).toLocaleString()}`,
       icon: IndianRupee,
-      color: 'bg-orange-500',
       textColor: 'text-orange-600',
       bgColor: 'bg-orange-50'
     }
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800';
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const getStatusColor = (status: string) =>
+    ({
+      delivered: 'bg-green-100 text-green-800',
+      shipped: 'bg-blue-100 text-blue-800',
+      processing: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-purple-100 text-purple-800'
+    }[status] || 'bg-gray-100 text-gray-800');
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const getPaymentStatusColor = (status: string) =>
+    ({
+      paid: 'bg-green-100 text-green-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      failed: 'bg-red-100 text-red-800'
+    }[status] || 'bg-gray-100 text-gray-800');
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-        <p className="text-gray-600 mt-1">Welcome back! Here's what's happening with your store.</p>
+        <p className="text-gray-600 mt-1">
+          Welcome back! Here&apos;s what&apos;s happening with your store.
+        </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div
+              key={index}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
+                  <p className="text-sm text-gray-600">{stat.title}</p>
                   <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
                 </div>
                 <div className={`${stat.bgColor} p-3 rounded-lg`}>
@@ -147,34 +169,35 @@ export default function DashboardOverview() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Low Stock Products */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-orange-500" />
-              <h2 className="text-xl font-bold text-gray-900">Low Stock Alert</h2>
-            </div>
+        {/* Low Stock */}
+        <div className="bg-white rounded-xl border">
+          <div className="p-6 border-b flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-orange-500" />
+            <h2 className="text-xl font-bold">Low Stock Alert</h2>
           </div>
           <div className="p-6">
-            {stats?.lowStockProducts && stats.lowStockProducts.length > 0 ? (
-              <div className="space-y-4">
-                {stats.lowStockProducts.map((product) => (
-                  <div key={product.id} className="flex items-center gap-4 p-3 bg-orange-50 rounded-lg">
-                    <img
-                      src={product.image_url || '/placeholder-product.jpg'}
-                      alt={product.name}
-                      className="w-12 h-12 rounded object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{product.name}</p>
-                      <p className="text-sm text-gray-600">₹{product.price.toLocaleString()}</p>
-                    </div>
-                    <span className="px-3 py-1 bg-orange-100 text-orange-800 text-sm font-semibold rounded-full">
-                      {product.stock} left
-                    </span>
+            {stats?.lowStockProducts.length ? (
+              stats.lowStockProducts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-4 bg-orange-50 p-3 rounded-lg mb-3"
+                >
+                  <img
+                    src={p.image_url || '/placeholder-product.jpg'}
+                    alt={p.name}
+                    className="w-12 h-12 rounded object-cover"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="text-sm text-gray-600">
+                      ₹{p.price.toLocaleString()}
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+                    {p.stock} left
+                  </span>
+                </div>
+              ))
             ) : (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
@@ -185,37 +208,38 @@ export default function DashboardOverview() {
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-500" />
-              <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
-            </div>
+        <div className="bg-white rounded-xl border">
+          <div className="p-6 border-b flex items-center gap-2">
+            <Clock className="w-5 h-5 text-blue-500" />
+            <h2 className="text-xl font-bold">Recent Orders</h2>
           </div>
           <div className="p-6">
-            {stats?.recentOrders && stats.recentOrders.length > 0 ? (
-              <div className="space-y-4">
-                {stats.recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">#{order.orderNumber}</p>
-                      <p className="text-sm text-gray-600">{order.customer}</p>
-                      <div className="flex gap-2 mt-1">
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getPaymentStatusColor(order.paymentStatus)}`}>
-                          {order.paymentStatus}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900">₹{order.amount.toLocaleString()}</p>
-                      <p className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString()}</p>
+            {stats?.recentOrders.length ? (
+              stats.recentOrders.map((o) => (
+                <div
+                  key={o.id}
+                  className="flex justify-between bg-gray-50 p-3 rounded-lg mb-3"
+                >
+                  <div>
+                    <p className="font-semibold">#{o.orderNumber}</p>
+                    <p className="text-sm text-gray-600">{o.customer}</p>
+                    <div className="flex gap-2 mt-1">
+                      <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(o.status)}`}>
+                        {o.status}
+                      </span>
+                      <span className={`px-2 py-0.5 text-xs rounded ${getPaymentStatusColor(o.paymentStatus)}`}>
+                        {o.paymentStatus}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="text-right">
+                    <p className="font-bold">₹{o.amount.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(o.date).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))
             ) : (
               <div className="text-center py-8">
                 <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
@@ -225,8 +249,6 @@ export default function DashboardOverview() {
           </div>
         </div>
       </div>
-
-   
     </div>
   );
 }

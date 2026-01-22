@@ -3,27 +3,49 @@
 import { useState, useEffect } from 'react';
 import { 
   Save, 
-  Upload, 
   Database, 
   Cloud, 
   AlertCircle,
   CheckCircle,
-  HardDrive,
   Zap
 } from 'lucide-react';
 
+interface UsageMetric {
+  used: number;
+  limit: number;
+  percentage: number;
+}
+
 interface CloudinaryUsage {
-  images: { used: number; limit: number; percentage: number };
-  storage: { used: number; limit: number; percentage: number };
-  bandwidth: { used: number; limit: number; percentage: number };
-  transformations: { used: number; limit: number; percentage: number };
+  images: UsageMetric;
+  storage: UsageMetric;
+  bandwidth: UsageMetric;
+  transformations: UsageMetric;
 }
 
 interface SupabaseUsage {
-  rows: { used: number; limit: number; percentage: number };
-  storage: { used: number; limit: number; percentage: number };
-  bandwidth: { used: number; limit: number; percentage: number };
-  tables: any;
+  rows: UsageMetric;
+  storage: UsageMetric;
+  bandwidth: UsageMetric;
+  tables: Record<string, number>;
+}
+
+interface CloudinaryApiResponse {
+  success: boolean;
+  data: CloudinaryUsage;
+}
+
+interface SupabaseApiResponse {
+  success: boolean;
+  data: SupabaseUsage;
+}
+
+interface UsageBarProps {
+  label: string;
+  used: number;
+  limit: number;
+  unit: string;
+  percentage: number;
 }
 
 export default function SettingsPage() {
@@ -46,8 +68,8 @@ export default function SettingsPage() {
         fetch('/api/admin/supabase-usage')
       ]);
 
-      const cloudinaryData = await cloudinaryRes.json();
-      const supabaseData = await supabaseRes.json();
+      const cloudinaryData = await cloudinaryRes.json() as CloudinaryApiResponse;
+      const supabaseData = await supabaseRes.json() as SupabaseApiResponse;
 
       if (cloudinaryData.success) {
         setCloudinaryUsage(cloudinaryData.data);
@@ -74,7 +96,7 @@ export default function SettingsPage() {
     return 'bg-green-500';
   };
 
-  const UsageBar = ({ label, used, limit, unit, percentage }: any) => (
+  const UsageBar = ({ label, used, limit, unit, percentage }: UsageBarProps) => (
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
         <span className="font-medium text-gray-700">{label}</span>
@@ -287,7 +309,7 @@ export default function SettingsPage() {
                       <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                         <p className="font-semibold text-gray-900 mb-3">Table Breakdown</p>
                         <div className="grid grid-cols-2 gap-3">
-                          {Object.entries(supabaseUsage.tables).map(([table, count]: any) => (
+                          {Object.entries(supabaseUsage.tables).map(([table, count]) => (
                             <div key={table} className="flex justify-between text-sm">
                               <span className="text-gray-600">{table}</span>
                               <span className="font-semibold text-gray-900">{count} rows</span>

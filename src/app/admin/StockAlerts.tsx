@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { AlertTriangle, XCircle, Package } from 'lucide-react'
+import Image from 'next/image'
 
 interface Product {
   id: number
@@ -14,6 +15,11 @@ interface Product {
   stock: number
   image_url: string
   price: number
+}
+
+interface InventoryApiResponse {
+  success: boolean
+  data: Product[]
 }
 
 export default function StockAlerts() {
@@ -29,14 +35,14 @@ export default function StockAlerts() {
     try {
       // Get low stock products
       const lowRes = await fetch('/api/inventory?type=low-stock')
-      const lowData = await lowRes.json()
+      const lowData = await lowRes.json() as InventoryApiResponse
       if (lowData.success) {
         setLowStock(lowData.data)
       }
 
       // Get out of stock products
       const outRes = await fetch('/api/inventory?type=out-of-stock')
-      const outData = await outRes.json()
+      const outData = await outRes.json() as InventoryApiResponse
       if (outData.success) {
         setOutOfStock(outData.data)
       }
@@ -106,9 +112,11 @@ export default function StockAlerts() {
                   key={product.id}
                   className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg"
                 >
-                  <img
+                  <Image
                     src={product.image_url || '/placeholder.svg'}
                     alt={product.name}
+                    width={48}
+                    height={48}
                     className="w-12 h-12 object-cover rounded"
                   />
                   <div className="flex-1 min-w-0">
@@ -137,9 +145,11 @@ export default function StockAlerts() {
                   key={product.id}
                   className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg"
                 >
-                  <img
+                  <Image
                     src={product.image_url || '/placeholder.svg'}
                     alt={product.name}
+                    width={48}
+                    height={48}
                     className="w-12 h-12 object-cover rounded"
                   />
                   <div className="flex-1 min-w-0">

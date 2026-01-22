@@ -1,21 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Search, Eye, Truck, CheckCircle, XCircle, Filter, Download } from 'lucide-react';
+import { Download, Eye, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+interface OrderItem {
+  product_image: string;
+  product_name: string;
+  size: string;
+  color: string;
+  quantity: number;
+  subtotal: number;
+}
+
+interface ShippingAddress {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state: string;
+  postal_code: string;
+}
 
 interface Order {
   id: string;
   order_number: string;
   user_id: string;
-  items: any[];
+  items: OrderItem[];
   total: number;
-  shipping_address: any;
+  shipping_address: ShippingAddress;
   payment_method: string;
   payment_status: string;
   order_status: string;
   created_at: string;
   razorpay_payment_id?: string;
 }
+
+interface OrdersApiResponse {
+  success: boolean;
+  data: Order[];
+  error?: string;
+}
+
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -28,15 +55,25 @@ export default function OrdersManagement() {
   useEffect(() => {
     fetchOrders();
   }, []);
-
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/admin/orders');
-      const data = await response.json();
-      setOrders(data || []);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+
+      const data = (await response.json()) as OrdersApiResponse;
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch orders');
+      }
+
+      setOrders(data.data);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
+      setOrders([]);
     } finally {
       setLoading(false);
     }

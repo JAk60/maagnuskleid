@@ -1,19 +1,23 @@
 // app/admin/ExchangeManagement.tsx - SIMPLIFIED (NO PAYMENT/REFUND)
 
 'use client';
-
-import { useState, useEffect } from 'react';
-import { 
-  ArrowLeftRight, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Truck, 
+import {
+  CheckCircle,
+  Clock,
   Eye,
+  Package,
   Search,
-  Package
+  Truck,
+  XCircle
 } from 'lucide-react';
-
+import { useEffect, useState } from 'react';
+interface ExchangeItem {
+  product_image: string;
+  product_name: string;
+  size: string;
+  color: string;
+  quantity: number;
+}
 interface ExchangeRequest {
   id: string;
   order_id: string;
@@ -21,8 +25,8 @@ interface ExchangeRequest {
   user_id: string;
   customer_name: string;
   customer_email: string;
-  original_items: any[];
-  requested_items: any[];
+  original_items: ExchangeItem[];
+  requested_items: ExchangeItem[];
   exchange_type: 'size' | 'color';
   reason: string;
   description?: string;
@@ -34,6 +38,11 @@ interface ExchangeRequest {
   tracking_number?: string;
 }
 
+interface ExchangesApiResponse {
+  success: boolean;
+  data: ExchangeRequest[];
+  error?: string;
+}
 export default function ExchangeManagement() {
   const [exchanges, setExchanges] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +68,7 @@ export default function ExchangeManagement() {
         : `/api/admin/exchanges?status=${filterStatus}`;
       
       const response = await fetch(url);
-      const data = await response.json();
+      const data = await response.json() as ExchangesApiResponse;
       
       if (data.success) {
         setExchanges(data.data || []);
@@ -128,7 +137,7 @@ export default function ExchangeManagement() {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json()  as { success: boolean; error?: string };
 
       if (data.success) {
         alert(`Exchange ${actionType}d successfully!`);

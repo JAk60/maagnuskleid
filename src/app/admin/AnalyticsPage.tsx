@@ -282,7 +282,7 @@ export default function AnalyticsPage() {
                 <div className="w-24 text-sm">{month.month}</div>
                 <div className="flex-1 bg-gray-100 rounded-full h-8">
                   <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full flex items-center justify-end pr-3 text-white text-sm"
+                    className="bg-linear-to-r from-blue-500 to-purple-600 h-full rounded-full flex items-center justify-end pr-3 text-white text-sm"
                     style={{ width: `${width}%` }}
                   >
                     ₹{month.revenue.toLocaleString()}
@@ -303,7 +303,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Performance Insights */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+      <div className="bg-linear-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
         <h2 className="text-2xl font-bold mb-4">Performance Insights</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white/20 rounded-lg p-4">

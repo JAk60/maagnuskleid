@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, X, Save, Search, Upload, Image as ImageIcon, Ruler, ChevronUp, ChevronDown, Package } from "lucide-react";
 import { Category } from "@/lib/categories-db";
+import { ChevronDown, ChevronUp, Edit, Image as ImageIcon, Package, Plus, Ruler, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 
 interface ColorOption {
   name: string;
@@ -24,7 +25,7 @@ interface SizeChart {
 }
 
 interface Product {
-  id?: number;
+  id?: string;
   name: string;
   description: string;
   price: number;
@@ -42,6 +43,40 @@ interface Product {
   breadth?: number;
   height?: number;
   sku?: string;
+}
+
+interface ProductsApiResponse {
+  success: boolean;
+  data: Product[];
+  error?: string;
+}
+
+interface DeleteApiResponse {
+  success: boolean;
+  error?: string;
+}
+
+interface CloudinaryUploadResult {
+  event: string;
+  info?: {
+    secure_url: string;
+  };
+}
+
+interface CloudinaryWidget {
+  open: () => void;
+  close: () => void;
+}
+
+declare global {
+  interface Window {
+    cloudinary?: {
+      createUploadWidget: (
+        config: Record<string, unknown>,
+        callback: (error: Error | null, result: CloudinaryUploadResult) => void
+      ) => CloudinaryWidget;
+    };
+  }
 }
 
 const SIZES = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
@@ -79,9 +114,7 @@ export default function ProductsManagement() {
   const [showPresets, setShowPresets] = useState(false);
   const [cloudinaryLoaded, setCloudinaryLoaded] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
-  const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [sizeChart, setSizeChart] = useState<SizeChart[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -107,16 +140,13 @@ export default function ProductsManagement() {
 
   const fetchCategories = async () => {
     try {
-      setLoadingCategories(true);
       const response = await fetch('/api/categories');
-      const data = await response.json();
+      const data = await response.json() as { success: boolean; data: Category[] };
       if (data.success) {
         setCategories(data.data);
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
-    } finally {
-      setLoadingCategories(false);
     }
   };
 
@@ -127,7 +157,7 @@ export default function ProductsManagement() {
   const availableCategories = getCategoriesByGender(formData.gender);
   
   const loadCloudinaryScript = () => {
-    if ((window as any).cloudinary) {
+    if (window.cloudinary) {
       setCloudinaryLoaded(true);
       return;
     }
@@ -143,11 +173,21 @@ export default function ProductsManagement() {
     try {
       setLoading(true);
       const response = await fetch("/api/admin/products");
-      const data = await response.json();
-      setProducts(data || []);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json() as ProductsApiResponse;
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to load products");
+      }
+
+      setProducts(data.data);
     } catch (error) {
       console.error("Failed to load products:", error);
-      alert("Failed to load products");
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -223,7 +263,7 @@ export default function ProductsManagement() {
   };
 
   const handleCloudinaryUpload = (imageIndex?: number) => {
-    if (!cloudinaryLoaded || !(window as any).cloudinary) {
+    if (!cloudinaryLoaded || !window.cloudinary) {
       alert("Cloudinary is still loading. Please try again in a moment.");
       return;
     }
@@ -234,8 +274,8 @@ export default function ProductsManagement() {
       return;
     }
     setUploading(true);
-    if (imageIndex !== undefined) setUploadingImageIndex(imageIndex);
-    const widget = (window as any).cloudinary.createUploadWidget(
+    
+    const widget = window.cloudinary.createUploadWidget(
       {
         cloudName,
         uploadPreset,
@@ -249,15 +289,14 @@ export default function ProductsManagement() {
         cropping: true,
         croppingAspectRatio: 1,
       },
-      (error: any, result: any) => {
+      (error: Error | null, result: CloudinaryUploadResult) => {
         if (error) {
           console.error("Cloudinary upload error:", error);
           alert("Upload failed");
           setUploading(false);
-          setUploadingImageIndex(null);
           return;
         }
-        if (result?.event === "success") {
+        if (result?.event === "success" && result.info) {
           const imageUrl = result.info.secure_url;
           if (imageIndex !== undefined) {
             const newImages = [...productImages];
@@ -275,12 +314,10 @@ export default function ProductsManagement() {
             setFormData(prev => ({ ...prev, image_url: imageUrl }));
           }
           setUploading(false);
-          setUploadingImageIndex(null);
           widget.close();
         }
         if (result?.event === "close" || result?.event === "abort") {
           setUploading(false);
-          setUploadingImageIndex(null);
         }
       }
     );
@@ -333,7 +370,7 @@ export default function ProductsManagement() {
     setSizeChart(chart);
   };
 
-  const updateSizeChart = (index: number, field: keyof SizeChart, value: any) => {
+  const updateSizeChart = (index: number, field: keyof SizeChart, value: number | string | undefined) => {
     const newChart = [...sizeChart];
     newChart[index] = { ...newChart[index], [field]: value };
     setSizeChart(newChart);
@@ -466,28 +503,44 @@ export default function ProductsManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingProduct ? { id: editingProduct.id, ...payload } : payload),
       });
-      const data = await res.json();
+      const data = await res.json() as ProductsApiResponse;
       if (!res.ok || !data.success) throw new Error(data.error);
       alert(editingProduct ? "Product updated successfully!" : "Product created successfully!");
       await fetchProducts();
       handleCloseModal();
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        alert("Error: " + err.message);
+      } else {
+        alert("An unknown error occurred");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
+
     try {
-      const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      const res = await fetch(`/api/admin/products?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json() as DeleteApiResponse;
+
+      if (!data.success) {
+        throw new Error(data.error || "Delete failed");
+      }
+
       alert("Product deleted successfully!");
       fetchProducts();
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (error) {
+      if (error instanceof Error) {
+        alert("Error: " + error.message);
+      } else {
+        alert("An unknown error occurred");
+      }
     }
   };
 
@@ -530,7 +583,7 @@ export default function ProductsManagement() {
 
       <div className="bg-white p-4 rounded-xl border shadow-sm space-y-4">
         <div className="flex gap-4 flex-wrap">
-          <div className="relative flex-1 min-w-[250px]">
+          <div className="relative flex-1 min-w-62.5">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={searchQuery}
@@ -545,7 +598,7 @@ export default function ProductsManagement() {
           <select
             value={filterGender}
             onChange={(e) => {
-              setFilterGender(e.target.value as any);
+              setFilterGender(e.target.value as "all" | "Male" | "Female");
               setFilterCategory("all");
               setCurrentPage(1);
             }}
@@ -567,9 +620,11 @@ export default function ProductsManagement() {
         ) : (
           currentItems.map((product) => (
             <div key={product.id} className="bg-white rounded-lg border p-4 flex gap-4 hover:shadow-md transition">
-              <img
+              <Image
                 src={product.image_url}
                 alt={product.name}
+                width={96}
+                height={96}
                 className="w-24 h-24 rounded object-cover"
               />
               <div className="flex-1">
@@ -822,7 +877,13 @@ export default function ProductsManagement() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   {productImages.map((img, index) => (
                     <div key={index} className="relative border-2 border-gray-300 rounded-lg overflow-hidden group">
-                      <img src={img.image_url} alt={`Product ${index + 1}`} className="w-full h-48 object-cover" />
+                      <Image
+                        src={img.image_url}
+                        alt={`Product ${index + 1}`}
+                        width={300}
+                        height={300}
+                        className="w-full h-48 object-cover"
+                      />
 
                       {img.is_primary && (
                         <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">

@@ -3,8 +3,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, Calendar, ShoppingBag, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Eye, Mail, Search, ShoppingBag } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface Customer {
   id: string;
@@ -16,7 +16,10 @@ interface Customer {
   total_spent?: number;
   last_order_date?: string;
 }
-
+interface CustomersApiResponse {
+  customers?: Customer[];
+  error?: string;
+}
 interface Order {
   id: string;
   order_number: string;
@@ -24,7 +27,17 @@ interface Order {
   order_status: string;
   payment_status: string;
   created_at: string;
-  items: any[];
+  items: unknown[];
+}
+interface OrdersApiResponse {
+  orders: Order[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 export default function CustomersManagement() {
@@ -52,66 +65,56 @@ export default function CustomersManagement() {
     fetchCustomers();
   }, []);
 
-  const fetchCustomers = async () => {
+   const fetchCustomers = async () => {
     try {
       setLoading(true);
       setError('');
+
       const response = await fetch('/api/admin/customers');
-      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error ${response.status}`);
       }
-      
-      const data = await response.json();
-      
-      if (Array.isArray(data)) {
-        setCustomers(data);
-      } else if (data.customers && Array.isArray(data.customers)) {
-        setCustomers(data.customers);
-      } else {
-        console.error('Invalid customers data:', data);
-        setCustomers([]);
-        setError(data.error || 'Invalid data format received');
+
+      const data = (await response.json()) as CustomersApiResponse;
+
+      if (!Array.isArray(data.customers)) {
+        throw new Error(data.error || 'Invalid customers data');
       }
-    } catch (error: any) {
-      console.error('Failed to fetch customers:', error);
+
+      setCustomers(data.customers);
+    } catch (err) {
+      console.error(err);
       setCustomers([]);
-      setError(error.message || 'Failed to load customers');
+      setError(err instanceof Error ? err.message : 'Failed to load customers');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCustomerOrders = async (userId: string, page: number = 1) => {
+  const fetchCustomerOrders = async (userId: string, page = 1) => {
     try {
       setOrdersLoading(true);
+
       const response = await fetch(
         `/api/admin/customers/${userId}/orders?page=${page}&limit=${ordersPagination.limit}`
       );
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error ${response.status}`);
       }
-      
-      const data = await response.json();
-      
-      console.log('Orders response:', data);
-      
-      setCustomerOrders(data.orders || []);
-      setOrdersPagination(data.pagination || {
-        page: 1,
-        limit: 5,
-        total: 0,
-        totalPages: 0,
-        hasMore: false
-      });
-    } catch (error) {
-      console.error('Failed to fetch customer orders:', error);
+
+      const data = (await response.json()) as OrdersApiResponse;
+
+      setCustomerOrders(data.orders);
+      setOrdersPagination(data.pagination);
+    } catch (err) {
+      console.error(err);
       setCustomerOrders([]);
     } finally {
       setOrdersLoading(false);
     }
   };
+
 
   const viewCustomerDetails = async (customer: Customer) => {
     setSelectedCustomer(customer);
