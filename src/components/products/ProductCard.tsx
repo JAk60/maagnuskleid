@@ -22,18 +22,20 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
 
-  // Helper function to get color hex value
-  const getColorHex = (color: any): string => {
+// Helper function to get color hex value
+  const getColorHex = (color: string | { name?: string; hex: string }): string => {
     if (typeof color === 'string') {
+      // Old format: string color
       return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
     } else if (color && typeof color === 'object' && color.hex) {
+      // New format: {name, hex}
       return color.hex;
     }
-    return '#000000';
+    return '#000000'; // fallback
   };
 
   // Helper function to get color title
-  const getColorTitle = (color: any): string => {
+  const getColorTitle = (color: string | { name?: string; hex: string }): string => {
     if (typeof color === 'string') {
       return color;
     } else if (color && typeof color === 'object') {

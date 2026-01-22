@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence, animate } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
+import React, { useEffect, useState } from 'react';
 
 const testimonials = [
   {
@@ -79,7 +80,7 @@ const AnimatedTestimonials = ({autoplay = true }) => {
                   className="absolute inset-0 origin-bottom"
                   style={{ perspective: '1000px' }}
                 >
-                  <img
+                  <Image
                     src={testimonial.src}
                     alt={testimonial.name}
                     width={500}
@@ -112,7 +113,7 @@ const AnimatedTestimonials = ({autoplay = true }) => {
                   {testimonials[active].name}
                 </h3>
                 <motion.p className="mt-8 text-lg text-slate-700 dark:text-slate-300">
-                  "{testimonials[active].quote}"
+                  {testimonials[active].quote}
                 </motion.p>
               </div>
             </motion.div>

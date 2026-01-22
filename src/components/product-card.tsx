@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useCart } from "@/context/cart-context"
+import Image from "next/image"
 
 interface Product {
   id: number
@@ -47,7 +48,7 @@ export function ProductCard({ product }: { product: Product }) {
       {/* Image */}
       <Link href={`/products/${product?.id}`}>
         <div className="relative overflow-hidden bg-muted h-64 md:h-72">
-          <img
+          <Image
             src={product?.image || "/placeholder.svg"}
             alt={product?.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

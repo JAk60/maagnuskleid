@@ -15,13 +15,15 @@ interface FilterSidebarProps {
 }
 
 // Helper function to get color hex value
-const getColorHex = (color: any): string => {
+const getColorHex = (color: string | { name?: string; hex: string }): string => {
   if (typeof color === 'string') {
+    // Old format: string color
     return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
   } else if (color && typeof color === 'object' && color.hex) {
+    // New format: {name, hex}
     return color.hex;
   }
-  return '#000000';
+  return '#000000'; // fallback
 };
 
 export default function FilterSidebar({
@@ -54,7 +56,7 @@ export default function FilterSidebar({
     onChange({ ...filters, sizes: newSizes });
   };
 
-  const handleColorChange = (color: any) => {
+  const handleColorChange = (color: string | { name: string; hex: string }) => {
     const colorValue = typeof color === 'string' ? color : color.name || color.hex;
     const newColors = filters.colors.includes(colorValue)
       ? filters.colors.filter(c => c !== colorValue)

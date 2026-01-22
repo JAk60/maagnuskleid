@@ -7,10 +7,8 @@ import { useState } from "react"
 
 export function Navbar() {
   const { items } = useCart()
-  const { isLoggedIn, user, logout } = useAuth()
+  const { isLoggedIn, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [menDropdownOpen, setMenDropdownOpen] = useState(false)
-  const [womenDropdownOpen, setWomenDropdownOpen] = useState(false)
 
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -32,7 +30,7 @@ export function Navbar() {
             {/* Male's Dropdown */}
             <div className="relative group">
               <button className="text-sm text-gray-900 hover:text-gray-600 transition-colors flex items-center gap-1">
-                Male's
+                Male
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="w-4 h-4"
@@ -60,7 +58,7 @@ export function Navbar() {
             {/* Female's Dropdown */}
             <div className="relative group">
               <button className="text-sm text-gray-900 hover:text-gray-600 transition-colors flex items-center gap-1">
-                Female's
+                Female
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="w-4 h-4"
@@ -157,10 +155,10 @@ export function Navbar() {
               Home
             </Link>
             <Link href="/products" className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-50">
-              Male's
+              Male
             </Link>
             <Link href="/products" className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-50">
-              Female's
+              Female
             </Link>
             <Link href="/about" className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-50">
               About

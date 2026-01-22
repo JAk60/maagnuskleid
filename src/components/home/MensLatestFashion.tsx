@@ -51,14 +51,14 @@ export default function MensLatestFashion() {
                 <div className="max-w-7xl px-5 md:px-10 mx-auto">
                     <div className="text-center mb-12">
                         <h2 className="text-[28px] md:text-[34px] font-semibold leading-tight">
-                            Men's Latest Fashion
+                            Men Latest Fashion
                         </h2>
                     </div>
                     {/* Mobile Carousel Skeleton */}
                     <div className="md:hidden">
                         <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4">
                             {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="flex-shrink-0 w-[280px] snap-start animate-pulse">
+                                <div key={i} className="shrink-0 w-70 snap-start animate-pulse">
                                     <div className="bg-gray-200 aspect-square rounded-lg mb-4"></div>
                                     <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                                     <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -87,7 +87,7 @@ export default function MensLatestFashion() {
                 <div className="max-w-7xl px-5 md:px-10 mx-auto">
                     <div className="text-center mb-12">
                         <h2 className="text-[28px] md:text-[34px] font-semibold leading-tight">
-                            Men's Latest Fashion
+                            Men Latest Fashion
                         </h2>
                     </div>
                     <div className="text-center py-12">
@@ -103,7 +103,7 @@ export default function MensLatestFashion() {
             <div className="max-w-7xl px-5 md:px-10 mx-auto">
                 <div className="text-center mb-8 md:mb-12">
                     <h2 className="text-[28px] md:text-[34px] font-semibold leading-tight mb-3">
-                        Men's Latest Fashion
+                        Men Latest Fashion
                     </h2>
                     <p className="text-gray-600">Discover the newest styles for men</p>
                 </div>
@@ -120,7 +120,7 @@ export default function MensLatestFashion() {
                         }}
                     >
                         {products.map((product) => (
-                            <div key={product.id} className="flex-shrink-0 w-[280px] snap-start">
+                            <div key={product.id} className="shrink-0 w-70 snap-start">
                                 <ProductCard product={product} />
                             </div>
                         ))}
@@ -159,7 +159,7 @@ export default function MensLatestFashion() {
                         href="/products/gender/Male"
                         className="inline-block px-8 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold"
                     >
-                        View All Men's Products
+                        View All Men Products
                     </Link>
                 </div>
             </div>

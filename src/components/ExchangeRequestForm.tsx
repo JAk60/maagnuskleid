@@ -1,21 +1,50 @@
 // components/ExchangeRequestForm.tsx - SIZE/COLOR ONLY
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { ArrowLeftRight, AlertCircle, CheckCircle, Package, X } from 'lucide-react';
 
+interface OrderItem {
+  id?: string;
+  product_id: string;
+  product_name: string;
+  product_image: string;
+  size: string;
+  color: string;
+  quantity: number;
+  price: number;
+}
+
+interface Order {
+  id: string;
+  user_id: string;
+  items: OrderItem[];
+}
+
+interface EligibilityResponse {
+  eligible: boolean;
+  reason?: string;
+  daysRemaining?: number | null;
+}
+
 interface ExchangeRequestFormProps {
-  order: any;
+  order: Order;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
+interface ExchangeResponse {
+  success: boolean;
+  error?: string;
+}
+
 export default function ExchangeRequestForm({ order, onClose, onSuccess }: ExchangeRequestFormProps) {
   const [loading, setLoading] = useState(false);
-  const [eligibility, setEligibility] = useState<any>(null);
+  const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
   
   // Form state
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<OrderItem | null>(null);
   const [exchangeType, setExchangeType] = useState<'size' | 'color' | ''>('');
   const [newSize, setNewSize] = useState('');
   const [newColor, setNewColor] = useState('');
@@ -39,16 +68,12 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
     ]
   };
 
-  useEffect(() => {
-    checkEligibility();
-  }, []);
-
-  const checkEligibility = async () => {
+  const checkEligibility = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/exchanges/eligibility?orderId=${order.id}&userId=${order.user_id}`
       );
-      const data = await response.json();
+      const data = await response.json() as EligibilityResponse;
       setEligibility(data);
     } catch (error) {
       console.error('Eligibility check failed:', error);
@@ -59,7 +84,11 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
     } finally {
       setCheckingEligibility(false);
     }
-  };
+  }, [order.id, order.user_id]);
+
+  useEffect(() => {
+    checkEligibility();
+  }, [checkEligibility]);
 
   const handleSubmit = async () => {
     if (!selectedItem) {
@@ -136,7 +165,7 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
         body: JSON.stringify(exchangeData)
       });
 
-      const result = await response.json();
+      const result = await response.json() as ExchangeResponse;
 
       if (result.success) {
         alert('Exchange request submitted successfully! Our team will review it shortly.');
@@ -192,7 +221,7 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
       </div>
 
       {/* Eligibility Info */}
-      {eligibility.daysRemaining !== null && (
+      {eligibility.daysRemaining !== null && eligibility.daysRemaining !== undefined && (
         <div className={`border rounded-lg p-4 ${
           eligibility.daysRemaining <= 5 
             ? 'bg-orange-50 border-orange-200' 
@@ -239,7 +268,7 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
         <div>
           <label className="block text-sm font-medium mb-3">Select Item to Exchange</label>
           <div className="space-y-3">
-            {order.items.map((item: any, idx: number) => (
+            {order.items.map((item: OrderItem, idx: number) => (
               <div
                 key={idx}
                 onClick={() => setSelectedItem(item)}
@@ -259,11 +288,14 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
                   )}
                 </div>
                 
-                <img
-                  src={item.product_image || '/placeholder.jpg'}
-                  alt={item.product_name}
-                  className="w-20 h-20 object-cover rounded-lg"
-                />
+                <div className="relative w-20 h-20">
+                  <Image
+                    src={item.product_image || '/placeholder.jpg'}
+                    alt={item.product_name}
+                    fill
+                    className="object-cover rounded-lg"
+                  />
+                </div>
                 
                 <div className="flex-1">
                   <h3 className="font-semibold">{item.product_name}</h3>

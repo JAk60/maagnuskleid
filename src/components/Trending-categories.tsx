@@ -8,6 +8,7 @@ import { getProducts } from "@/lib/supabase"
 import { formatPrice, addSlugToProduct } from "@/utils/helpers"
 import type { Product } from "@/lib/types"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import Image from "next/image"
 
 export default function TrendingCategories() {
   const [products, setProducts] = useState<Product[]>([])
@@ -45,8 +46,8 @@ export default function TrendingCategories() {
     }
   };
 
-  // Helper function to get color hex value
-  const getColorHex = (color: any): string => {
+// Helper function to get color hex value
+  const getColorHex = (color: string | { name?: string; hex: string }): string => {
     if (typeof color === 'string') {
       // Old format: string color
       return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
@@ -58,7 +59,7 @@ export default function TrendingCategories() {
   };
 
   // Helper function to get color title
-  const getColorTitle = (color: any): string => {
+  const getColorTitle = (color: string | { name?: string; hex: string }): string => {
     if (typeof color === 'string') {
       return color;
     } else if (color && typeof color === 'object') {
@@ -143,7 +144,7 @@ export default function TrendingCategories() {
               >
                 <div className="group cursor-pointer">
                   <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
-                    <img
+                    <Image
                       src={product.image_url || "/placeholder.svg"}
                       alt={product.name}
                       className="w-full h-full object-cover"
@@ -240,7 +241,7 @@ export default function TrendingCategories() {
             <Link key={product.id} href={`/products/${product.slug}`}>
               <div className="group cursor-pointer">
                 <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
-                  <img
+                  <Image
                     src={product.image_url || "/placeholder.svg"}
                     alt={product.name}
                     className="w-full h-full object-cover"
