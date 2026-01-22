@@ -28,8 +28,21 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   }
 });
 
+interface RawProduct {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  gender: string;
+  stock: number;
+  has_size_chart: boolean;
+  created_at: string;
+  [key: string]: unknown;
+}
+
 // Helper function to fetch images and size chart for a product
-async function enrichProductWithDetails(product: any): Promise<Product> {
+async function enrichProductWithDetails(product: RawProduct): Promise<Product> {
   const client = getSupabase();
   
   // Fetch product images

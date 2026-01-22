@@ -64,9 +64,10 @@ export async function adminLogin(email: string, password: string): Promise<{
     try {
       isValidPassword = await bcrypt.compare(password, admin.password_hash);
       console.log('✅ Password verification result:', isValidPassword);
-    } catch (bcryptError: any) {
-      console.error('❌ Bcrypt error:', bcryptError.message);
-      throw new Error('Password verification failed: ' + bcryptError.message);
+    } catch (bcryptError) {
+      const errorMessage = bcryptError instanceof Error ? bcryptError.message : 'Unknown error';
+      console.error('❌ Bcrypt error:', errorMessage);
+      throw new Error('Password verification failed: ' + errorMessage);
     }
     
     if (!isValidPassword) {
@@ -102,8 +103,9 @@ export async function adminLogin(email: string, password: string): Promise<{
     try {
       await supabase.rpc('update_admin_last_login', { admin_uuid: admin.id });
       console.log('✅ Last login updated');
-    } catch (updateError: any) {
-      console.warn('⚠️ Could not update last login:', updateError.message);
+    } catch (updateError) {
+      const errorMessage = updateError instanceof Error ? updateError.message : 'Unknown error';
+      console.warn('⚠️ Could not update last login:', errorMessage);
       // Don't fail login if this fails
     }
 
@@ -111,13 +113,14 @@ export async function adminLogin(email: string, password: string): Promise<{
     try {
       await logAdminActivity(admin.id, admin.email, 'LOGIN');
       console.log('✅ Activity logged');
-    } catch (logError: any) {
-      console.warn('⚠️ Could not log activity:', logError.message);
+    } catch (logError) {
+      const errorMessage = logError instanceof Error ? logError.message : 'Unknown error';
+      console.warn('⚠️ Could not log activity:', errorMessage);
       // Don't fail login if this fails
     }
 
     // 7. Remove password hash from response
-    const { password_hash, ...adminWithoutPassword } = admin;
+    const { password_hash: _password_hash, ...adminWithoutPassword } = admin;
 
     console.log('🎉 Login successful!');
 
@@ -126,7 +129,7 @@ export async function adminLogin(email: string, password: string): Promise<{
       token,
       expiresAt,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('💥 Admin login failed:', error);
     throw error;
   }
@@ -158,10 +161,10 @@ export async function verifyAdminToken(token: string): Promise<AdminUser | null>
     }
 
     // 3. Remove password hash
-    const { password_hash, ...adminWithoutPassword } = admin;
+    const { password_hash: _password_hash, ...adminWithoutPassword } = admin;
 
     return adminWithoutPassword as AdminUser;
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Token verification error:', error);
     return null;
   }
@@ -230,7 +233,7 @@ export async function createAdminUser(data: {
     { created_email: data.email, created_role: data.role }
   );
 
-  const { password_hash, ...adminWithoutPassword } = newAdmin;
+  const { password_hash: _password_hash, ...adminWithoutPassword } = newAdmin;
   return adminWithoutPassword as AdminUser;
 }
 
@@ -244,7 +247,7 @@ export async function logAdminActivity(
   action: string,
   resourceType?: string,
   resourceId?: string,
-  details?: any
+  details?: Record<string, unknown>
 ): Promise<void> {
   try {
     await supabase.rpc('log_admin_activity', {
@@ -255,7 +258,7 @@ export async function logAdminActivity(
       p_resource_id: resourceId || null,
       p_details: details ? JSON.stringify(details) : null,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to log activity:', error);
     // Don't throw - logging failure shouldn't break the app
   }

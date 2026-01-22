@@ -5,6 +5,12 @@
 import { useState, useEffect } from 'react';
 import { Category } from '@/lib/categories-db';
 
+interface CategoriesResponse {
+  success: boolean;
+  data: Category[];
+  error?: string;
+}
+
 export function useCategories(gender?: 'Male' | 'Female', withCount = false) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,13 +30,14 @@ export function useCategories(gender?: 'Male' | 'Female', withCount = false) {
       if (withCount) params.set('withCount', 'true');
 
       const response = await fetch(`/api/categories?${params}`);
-      const data = await response.json();
+      const data = await response.json() as CategoriesResponse;
 
-      if (!data.success) throw new Error(data.error);
+      if (!data.success) throw new Error(data.error || 'Failed to fetch categories');
 
       setCategories(data.data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

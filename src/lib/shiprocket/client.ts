@@ -11,6 +11,31 @@ import {
   ShipRocketError,
 } from './types';
 
+// Add new type definitions for responses
+interface CourierServiceabilityResponse {
+  available_courier_companies: Array<{
+    courier_company_id: number;
+    courier_name: string;
+    freight_charge: number;
+    rate: number;
+  }>;
+}
+
+interface PickupScheduleResponse {
+  pickup_scheduled_date: string;
+  pickup_token_number: string;
+  status: number;
+  response: {
+    pickup_scheduled_date: string;
+    pickup_token_number: string;
+  };
+}
+
+interface CancelShipmentResponse {
+  message: string;
+  status_code: number;
+}
+
 class ShipRocketClient {
   private baseURL: string;
   private email: string;
@@ -45,7 +70,7 @@ class ShipRocketClient {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = (await response.json()) as { message?: string };
         throw new Error(`Authentication failed: ${error.message || response.statusText}`);
       }
 
@@ -58,7 +83,7 @@ class ShipRocketClient {
       console.log('ShipRocket authentication successful');
       return data.token;
     } catch (error) {
-      console.error('ShipRocket authentication error:', error);
+      console.error('ShipRocket authentication error:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
@@ -92,15 +117,15 @@ class ShipRocketClient {
       },
     });
 
-    const data = await response.json();
+    const data: unknown = await response.json();
 
     if (!response.ok) {
-      const error: ShipRocketError = data;
+      const error = data as ShipRocketError;
       console.error('ShipRocket API error:', error);
       throw new Error(error.message || 'ShipRocket API request failed');
     }
 
-    return data;
+    return data as T;
   }
 
   /**
@@ -154,9 +179,9 @@ class ShipRocketClient {
    */
   async schedulePickup(
     payload: ShipRocketPickupSchedulePayload
-  ): Promise<any> {
+  ): Promise<PickupScheduleResponse> {
     try {
-      const response = await this.request('/courier/generate/pickup', {
+      const response = await this.request<PickupScheduleResponse>('/courier/generate/pickup', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -191,10 +216,15 @@ class ShipRocketClient {
   /**
    * Get available couriers for a shipment
    */
-  async getAvailableCouriers(shipmentId: number): Promise<any> {
+  async getAvailableCouriers(
+    pickupPostcode: string,
+    deliveryPostcode: string,
+    weight: number,
+    cod: 0 | 1 = 0
+  ): Promise<CourierServiceabilityResponse> {
     try {
-      const response = await this.request(
-        `/courier/serviceability/?pickup_postcode=${process.env.SHIPROCKET_PICKUP_PINCODE}&delivery_postcode=400001&weight=1&cod=0`,
+      const response = await this.request<CourierServiceabilityResponse>(
+        `/courier/serviceability/?pickup_postcode=${pickupPostcode}&delivery_postcode=${deliveryPostcode}&weight=${weight}&cod=${cod}`,
         {
           method: 'GET',
         }
@@ -210,9 +240,9 @@ class ShipRocketClient {
   /**
    * Cancel shipment
    */
-  async cancelShipment(shipmentIds: number[]): Promise<any> {
+  async cancelShipment(shipmentIds: number[]): Promise<CancelShipmentResponse> {
     try {
-      const response = await this.request('/orders/cancel', {
+      const response = await this.request<CancelShipmentResponse>('/orders/cancel', {
         method: 'POST',
         body: JSON.stringify({ ids: shipmentIds }),
       });

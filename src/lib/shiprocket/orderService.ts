@@ -4,8 +4,55 @@ import { shipRocketClient } from './client';
 import {
   ShipRocketCreateOrderPayload,
   ShipRocketOrderItem,
-  SupabaseOrder,
 } from './types';
+
+// Type definitions for order data structures
+interface OrderItem {
+  product_id: string;
+  product_name?: string;
+  quantity: number;
+  price: string | number;
+}
+
+interface ShippingAddress {
+  first_name: string;
+  last_name?: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  postal_code: string;
+  state: string;
+  country?: string;
+  phone: string;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  created_at: string;
+  user_id: string;
+  shipping_address: ShippingAddress;
+  items: OrderItem[];
+  payment_status: string;
+  shipping_cost: string | number;
+  subtotal: string | number;
+  shiprocket_order_id?: string;
+  shiprocket_shipment_id?: string;
+  shiprocket_status?: string;
+  order_status: string;
+}
+
+interface ProductDimensions {
+  weight?: number;
+  length?: number;
+  breadth?: number;
+  height?: number;
+}
+
+interface Product {
+  sku?: string;
+  name?: string;
+}
 
 // ✅ FIX: Lazy initialization
 function getSupabaseClient() {
@@ -22,13 +69,13 @@ function getSupabaseClient() {
 /**
  * Calculate package dimensions from order items
  */
-async function calculatePackageDimensions(items: any[]): Promise<{
+async function calculatePackageDimensions(items: OrderItem[]): Promise<{
   weight: number;
   length: number;
   breadth: number;
   height: number;
 }> {
-  const supabase = getSupabaseClient(); // ✅ Create client here
+  const supabase = getSupabaseClient();
   
   let totalWeight = 0;
   let maxLength = 0;
@@ -40,7 +87,7 @@ async function calculatePackageDimensions(items: any[]): Promise<{
       .from('products')
       .select('weight, length, breadth, height')
       .eq('id', item.product_id)
-      .single();
+      .single<ProductDimensions>();
 
     if (product) {
       const qty = item.quantity || 1;
@@ -67,8 +114,8 @@ async function calculatePackageDimensions(items: any[]): Promise<{
 /**
  * Transform order items to ShipRocket format
  */
-async function transformOrderItems(items: any[]): Promise<ShipRocketOrderItem[]> {
-  const supabase = getSupabaseClient(); // ✅ Create client here
+async function transformOrderItems(items: OrderItem[]): Promise<ShipRocketOrderItem[]> {
+  const supabase = getSupabaseClient();
   const shipRocketItems: ShipRocketOrderItem[] = [];
 
   for (const item of items) {
@@ -76,7 +123,7 @@ async function transformOrderItems(items: any[]): Promise<ShipRocketOrderItem[]>
       .from('products')
       .select('sku, name')
       .eq('id', item.product_id)
-      .single();
+      .single<Product>();
 
     shipRocketItems.push({
       name: item.product_name || product?.name || 'Product',
@@ -96,7 +143,7 @@ async function transformOrderItems(items: any[]): Promise<ShipRocketOrderItem[]>
  * Create ShipRocket order from Supabase order
  */
 export async function createShipRocketOrder(orderId: string) {
-  const supabase = getSupabaseClient(); // ✅ Create client here
+  const supabase = getSupabaseClient();
 
   try {
     console.log(`Creating ShipRocket order for: ${orderId}`);
@@ -105,7 +152,7 @@ export async function createShipRocketOrder(orderId: string) {
       .from('orders')
       .select('*')
       .eq('id', orderId)
-      .single();
+      .single<Order>();
 
     if (orderError || !order) {
       throw new Error(`Order not found: ${orderId}`);
@@ -202,7 +249,7 @@ export async function createShipRocketOrder(orderId: string) {
       shiprocket_order_id: shipRocketResponse.order_id,
       shiprocket_shipment_id: shipRocketResponse.shipment_id,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating ShipRocket order:', error);
 
     const supabase = getSupabaseClient();
@@ -210,7 +257,7 @@ export async function createShipRocketOrder(orderId: string) {
       order_id: orderId,
       action: 'create_order',
       status: 'error',
-      error_message: error.message,
+      error_message: error instanceof Error ? error.message : 'Unknown error',
     });
 
     throw error;
@@ -221,7 +268,7 @@ export async function createShipRocketOrder(orderId: string) {
  * Generate AWB for shipment
  */
 export async function generateAWBForOrder(orderId: string, shipmentId: number) {
-  const supabase = getSupabaseClient(); // ✅ Create client here
+  const supabase = getSupabaseClient();
 
   try {
     console.log(`Generating AWB for shipment: ${shipmentId}`);
@@ -258,7 +305,7 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
     console.log(`AWB generated: ${awbCode}`);
 
     return { awb_code: awbCode, courier_name: courierName };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error generating AWB:', error);
 
     const supabase = getSupabaseClient();
@@ -266,7 +313,7 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       order_id: orderId,
       action: 'generate_awb',
       status: 'error',
-      error_message: error.message,
+      error_message: error instanceof Error ? error.message : 'Unknown error',
     });
 
     return null;
@@ -277,14 +324,14 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
  * Schedule pickup for order
  */
 export async function schedulePickupForOrder(orderId: string) {
-  const supabase = getSupabaseClient(); // ✅ Create client here
+  const supabase = getSupabaseClient();
 
   try {
     const { data: order } = await supabase
       .from('orders')
       .select('shiprocket_shipment_id')
       .eq('id', orderId)
-      .single();
+      .single<{ shiprocket_shipment_id?: string }>();
 
     if (!order?.shiprocket_shipment_id) {
       throw new Error('Shipment ID not found');
@@ -310,7 +357,7 @@ export async function schedulePickupForOrder(orderId: string) {
     });
 
     return pickupResponse;
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error scheduling pickup:', error);
 
     const supabase = getSupabaseClient();
@@ -318,7 +365,7 @@ export async function schedulePickupForOrder(orderId: string) {
       order_id: orderId,
       action: 'schedule_pickup',
       status: 'error',
-      error_message: error.message,
+      error_message: error instanceof Error ? error.message : 'Unknown error',
     });
 
     throw error;

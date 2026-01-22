@@ -13,6 +13,24 @@ export interface RazorpayOrderOptions {
   notes?: Record<string, string>;
 }
 
+export interface RazorpayResponse {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+export interface RazorpayError {
+  reason?: string;
+  error?: {
+    code: string;
+    description: string;
+    source: string;
+    step: string;
+    reason: string;
+    metadata: Record<string, unknown>;
+  };
+}
+
 // Client-side: Initialize Razorpay checkout
 export function initializeRazorpay() {
   return new Promise((resolve) => {
@@ -40,8 +58,8 @@ export function openRazorpayCheckout(
     };
     notes?: Record<string, string>;
   },
-  onSuccess: (response: any) => void,
-  onError: (error: any) => void
+  onSuccess: (response: RazorpayResponse) => void,
+  onError: (error: RazorpayError) => void
 ) {
   const razorpayOptions = {
     key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -64,7 +82,7 @@ export function openRazorpayCheckout(
     },
   };
 
-  // @ts-ignore
+  // @ts-expect-error - Razorpay is loaded via external script
   const razorpay = new window.Razorpay(razorpayOptions);
   razorpay.on('payment.failed', onError);
   razorpay.open();

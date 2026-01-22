@@ -74,11 +74,11 @@ export async function updateProductStock(updates: StockUpdate[]): Promise<{ succ
       errors
     };
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Stock update error:', error);
     return {
       success: false,
-      errors: [error.message || 'Failed to update stock']
+      errors: [error instanceof Error ? error.message : 'Failed to update stock']
     };
   }
 }
@@ -127,11 +127,11 @@ export async function restoreProductStock(updates: StockUpdate[]): Promise<{ suc
       errors
     };
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Stock restore error:', error);
     return {
       success: false,
-      errors: [error.message || 'Failed to restore stock']
+      errors: [error instanceof Error ? error.message : 'Failed to restore stock']
     };
   }
 }
@@ -167,11 +167,11 @@ export async function validateStock(items: StockUpdate[]): Promise<{ valid: bool
       errors
     };
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Stock validation error:', error);
     return {
       valid: false,
-      errors: [error.message || 'Failed to validate stock']
+      errors: [error instanceof Error ? error.message : 'Failed to validate stock']
     };
   }
 }

@@ -1,8 +1,19 @@
 // lib/types.ts
 
+export interface SizeChartEntry {
+	size: string;
+	chest?: number;
+	waist?: number;
+	hips?: number;
+	length?: number;
+	shoulder?: number;
+	sleeve?: number;
+	[key: string]: string | number | undefined;
+}
+
 export interface Product {
-    size_chart: any;
-    has_size_chart: any;
+	size_chart: SizeChartEntry[];
+	has_size_chart: boolean;
 	id: number;
 	name: string;
 	description: string;

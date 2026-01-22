@@ -75,7 +75,7 @@ const Menu: React.FC<MenuProps> = ({
                 <BsChevronDown size={14} />
 
                 {item.name === "Male" && showMenCat && (
-                  <ul className="bg-[#E3D9C6] absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
+                  <ul className="bg-[#E3D9C6] absolute top-6 left-0 min-w-62.5 px-1 py-1 text-black shadow-lg rounded-md z-10">
                     {subMenuMenData.map((submenu) => {
                       return (
                         <Link
@@ -98,7 +98,7 @@ const Menu: React.FC<MenuProps> = ({
                 )}
 
                 {item.name === "Female" && showWomenCat && (
-                  <ul className="bg-[#E3D9C6] absolute top-6 left-0 min-w-[250px] px-1 py-1 text-black shadow-lg rounded-md z-10">
+                  <ul className="bg-[#E3D9C6] absolute top-6 left-0 min-w-62.5 px-1 py-1 text-black shadow-lg rounded-md z-10">
                     {subMenuWomenData.map((submenu) => {
                       return (
                         <Link

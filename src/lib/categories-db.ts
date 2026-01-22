@@ -199,12 +199,13 @@ export async function GET(request: Request) {
       success: true,
       data: categories,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Categories API Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch categories';
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to fetch categories',
+        error: errorMessage,
       },
       { status: 500 }
     );

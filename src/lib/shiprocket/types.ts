@@ -136,7 +136,7 @@ export interface SupabaseOrder {
   id: string;
   order_number: string;
   user_id: string;
-  items: any;
+  items: ShipRocketOrderItem[];
   shipping_address: {
     first_name: string;
     last_name: string;

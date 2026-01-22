@@ -1,7 +1,6 @@
 // lib/supabase-exchanges.ts - FIXED DUPLICATE PREVENTION
 
 import { supabase } from './supabase';
-import { Product } from './types';
 import { getProducts } from './supabase';
 
 // ==========================================
@@ -78,6 +77,23 @@ export interface ExchangeEligibility {
     status: string;
     created_at: string;
   };
+}
+
+interface OrderItem {
+  product_id: number;
+  product_name: string;
+  product_image: string;
+  size: string;
+  color: string;
+  quantity: number;
+  price: number;
+}
+
+interface ExchangeOriginalItem {
+  product_id: number;
+  size: string;
+  color: string;
+  quantity: number;
 }
 
 // ==========================================
@@ -194,7 +210,7 @@ export async function checkExchangeEligibility(
       const exchangedItemsMap = new Map<string, number>();
       
       completedExchanges.forEach(exchange => {
-        exchange.original_items.forEach((item: any) => {
+        (exchange.original_items as ExchangeOriginalItem[]).forEach((item) => {
           const key = `${item.product_id}-${item.size}-${item.color}`;
           const current = exchangedItemsMap.get(key) || 0;
           exchangedItemsMap.set(key, current + item.quantity);
@@ -203,7 +219,7 @@ export async function checkExchangeEligibility(
 
       // Check if ALL items have been fully exchanged
       let allItemsExchanged = true;
-      for (const orderItem of order.items) {
+      for (const orderItem of order.items as OrderItem[]) {
         const key = `${orderItem.product_id}-${orderItem.size}-${orderItem.color}`;
         const exchangedQty = exchangedItemsMap.get(key) || 0;
         if (exchangedQty < orderItem.quantity) {
@@ -226,7 +242,7 @@ export async function checkExchangeEligibility(
       warnings: warnings.length > 0 ? warnings : undefined
     };
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Exchange eligibility check error:', error);
     return {
       eligible: false,
@@ -274,7 +290,7 @@ export async function getAvailableItemsForExchange(orderId: string): Promise<{
     // Calculate exchanged quantities
     const exchangedMap = new Map<string, number>();
     exchanges?.forEach(exchange => {
-      exchange.original_items.forEach((item: any) => {
+      (exchange.original_items as ExchangeOriginalItem[]).forEach((item) => {
         const key = `${item.product_id}-${item.size}-${item.color}`;
         const current = exchangedMap.get(key) || 0;
         exchangedMap.set(key, current + item.quantity);
@@ -282,7 +298,7 @@ export async function getAvailableItemsForExchange(orderId: string): Promise<{
     });
 
     // Build available items list
-    const availableItems = order.items.map((item: any) => {
+    const availableItems = (order.items as OrderItem[]).map((item) => {
       const key = `${item.product_id}-${item.size}-${item.color}`;
       const exchangedQty = exchangedMap.get(key) || 0;
       const availableQty = item.quantity - exchangedQty;
@@ -297,11 +313,11 @@ export async function getAvailableItemsForExchange(orderId: string): Promise<{
         exchanged_quantity: exchangedQty,
         available_quantity: availableQty
       };
-    }).filter((item: { available_quantity: number; }) => item.available_quantity > 0);
+    }).filter((item) => item.available_quantity > 0);
 
     return { items: availableItems };
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error getting available items:', error);
     return { items: [], message: 'Error loading available items' };
   }
@@ -343,7 +359,7 @@ export async function validateExchangeItems(
     
     if (pastExchanges) {
       pastExchanges.forEach(exchange => {
-        exchange.original_items.forEach((item: any) => {
+        (exchange.original_items as ExchangeOriginalItem[]).forEach((item) => {
           const key = `${item.product_id}-${item.size}-${item.color}`;
           const current = exchangedQuantities.get(key) || 0;
           exchangedQuantities.set(key, current + item.quantity);
@@ -354,7 +370,7 @@ export async function validateExchangeItems(
     // Validate each selected item
     for (const selectedItem of selectedItems) {
       // Find item in original order
-      const orderItem = order.items.find((oi: any) => 
+      const orderItem = (order.items as OrderItem[]).find((oi) => 
         oi.product_id === selectedItem.product_id &&
         oi.size === selectedItem.size &&
         oi.color === selectedItem.color
@@ -395,7 +411,7 @@ export async function validateExchangeItems(
       errors.push('At least one item must be selected for exchange');
     }
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Item validation error:', error);
     errors.push('Failed to validate items. Please try again.');
   }
@@ -536,7 +552,7 @@ export async function validateReplacements(
       }
     }
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Replacement validation error:', error);
     errors.push('Failed to validate replacements. Please try again.');
   }
@@ -582,7 +598,7 @@ export async function verifyStockAvailability(
       }
     }
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Stock verification error:', error);
     errors.push('Unable to verify stock availability. Please try again.');
   }
@@ -723,11 +739,11 @@ export async function createExchangeRequest(
       data: data as ExchangeRequest
     };
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Create exchange request error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to create exchange request'
+      error: error instanceof Error ? error.message : 'Failed to create exchange request'
     };
   }
 }
@@ -779,7 +795,7 @@ export async function updateExchangeStatus(
   rejectionReason?: string,
   trackingNumber?: string
 ): Promise<ExchangeRequest> {
-  const updates: any = {
+  const updates: Record<string, string> = {
     status,
     updated_at: new Date().toISOString()
   };
