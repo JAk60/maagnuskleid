@@ -2,7 +2,6 @@
 
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import Wrapper from "@/components/Wrapper";
 import Link from "next/link";
 import Menu from "./Menu";
@@ -13,13 +12,18 @@ import { useAuth } from "@/context/auth-context";
 import { BsCart } from "react-icons/bs";
 import { BiMenuAltRight } from "react-icons/bi";
 import { VscChromeClose } from "react-icons/vsc";
-import { IoPersonOutline, IoSearchOutline } from "react-icons/io5";
+import { IoPersonOutline } from "react-icons/io5";
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   gender: 'Male' | 'Female' | 'Unisex';
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: Category[];
 }
 
 const Header = () => {
@@ -46,11 +50,11 @@ const Header = () => {
         
         // Fetch Male categories
         const menResponse = await fetch('/api/categories?gender=Male');
-        const menData = await menResponse.json();
+        const menData: ApiResponse = await menResponse.json();
         
         // Fetch Female categories
         const womenResponse = await fetch('/api/categories?gender=Female');
-        const womenData = await womenResponse.json();
+        const womenData: ApiResponse = await womenResponse.json();
 
         if (menData.success) {
           const formattedMen = menData.data.map((cat: Category) => ({
@@ -130,9 +134,9 @@ const Header = () => {
 
   return (
     <header
-      className={`w-full h-[60px] md:h-20 bg-[#E3D9C6] flex items-center justify-between z-20 sticky top-0 transition-transform duration-300 ${show}`}
+      className={`w-full h-15 md:h-20 bg-[#E3D9C6] flex items-center justify-between z-20 sticky top-0 transition-transform duration-300 ${show}`}
     >
-      <Wrapper className="h-[60px] md:h-20 flex justify-between items-center">
+      <Wrapper className="h-15 md:h-20 flex justify-between items-center">
         {/* Mobile Menu Icon - LEFT SIDE */}
         <div className="flex md:hidden w-10 h-10 rounded-full justify-center items-center cursor-pointer">
           {mobileMenu ? (
@@ -150,6 +154,7 @@ const Header = () => {
 
         {/* Logo - CENTERED ON MOBILE, LEFT ON DESKTOP */}
         <Link href="/" className="absolute left-1/2 -translate-x-1/2 md:relative md:left-0 md:translate-x-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/mk.png"
             alt="Maagnus Kleid"
