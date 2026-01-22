@@ -1,4 +1,4 @@
-// app/products/[slug]/page.tsx - Fixed version with proper types
+// app/products/[slug]/page.tsx - Optimized version with image preloading
 
 'use client';
 
@@ -42,23 +42,30 @@ export default function ProductDetailPage() {
     const [isAdding, setIsAdding] = useState(false);
     const [showSizeChart, setShowSizeChart] = useState(false);
 
-    useEffect(() => {
-        async function fetchProduct() {
-            try {
-                const allProducts = await getProducts();
-                const productsWithSlugs = allProducts.map(addSlugToProduct);
+   useEffect(() => {
+    async function fetchProduct() {
+        console.log('🔥 FETCH RUNNING - slug:', slug);
+        console.log('🔥 Params:', params);
+        
+        try {
+            const allProducts = await getProducts();
+            console.log('📦 Got products:', allProducts.length);
+            
+            const productsWithSlugs = allProducts.map(addSlugToProduct);
+            const foundProduct = productsWithSlugs.find(p => p.slug === slug);
 
-                const foundProduct = productsWithSlugs.find(p => p.slug === slug);
-
-                if (!foundProduct) {
-                    router.push('/products');
-                    return;
-                }
+            console.log('🔍 Found product:', foundProduct ? 'YES' : 'NO');
+            console.log('🔍 Looking for slug:', slug);
+            
+            if (!foundProduct) {
+                console.log('❌ REDIRECTING - Product not found!');
+                router.push('/products');
+                return;
+            }
 
                 setProduct(foundProduct);
 
-                setSelectedSize(foundProduct.sizes[0] || '');
-
+            setSelectedSize(foundProduct.sizes[0] || '');
                 const firstColor = foundProduct.colors[0];
                 const colorValue = typeof firstColor === 'string'
                     ? firstColor
@@ -81,7 +88,7 @@ export default function ProductDetailPage() {
         }
 
         fetchProduct();
-    }, [slug, router]);
+    }, [slug]);
 
     useEffect(() => {
         if (product && selectedSize && selectedColor) {
@@ -236,6 +243,20 @@ export default function ProductDetailPage() {
 
     return (
         <div className="min-h-screen bg-[#E3D9C6]">
+            {/* Hidden Image Preloader - Forces all images to load and optimize immediately */}
+            <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }} aria-hidden="true">
+                {images.map((img, i) => (
+                    <Image
+                        key={`preload-${i}`}
+                        src={img || '/placeholder-product.jpg'}
+                        width={1200}
+                        height={1600}
+                        alt=""
+                        priority={i < 3}
+                    />
+                ))}
+            </div>
+
             {/* Header */}
             <div className="border-b">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -277,8 +298,16 @@ export default function ProductDetailPage() {
                                         key={index}
                                         type="button"
                                         onClick={(e) => {
+                                            console.log('🔴 CLICK START - index:', index);
+                                            console.log('🔴 Button element:', e.currentTarget);
+                                            console.log('🔴 Has parent Link?', e.currentTarget.closest('a'));
+
                                             e.preventDefault();
                                             e.stopPropagation();
+
+                                            console.log('🖱️ Clicked thumbnail:', index);
+                                            console.log('🎯 Event target:', e.target);
+                                            console.log('📍 Current selected:', selectedImage);
                                             setSelectedImage(index);
                                         }}
                                         className={`relative aspect-square rounded-md overflow-hidden transition-all ${selectedImage === index ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-200 hover:ring-gray-400'
@@ -295,7 +324,7 @@ export default function ProductDetailPage() {
                                 ))}
                             </div>
                         )}
-                        
+
                         {/* Main Image */}
                         <div className="order-1 lg:order-2 flex-1">
                             <div className="relative aspect-3/4 overflow-hidden rounded-lg bg-gray-100">

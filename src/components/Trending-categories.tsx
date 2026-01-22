@@ -144,7 +144,7 @@ export default function TrendingCategories() {
               >
                 <div className="group cursor-pointer">
                   <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
-                    <Image
+                    <img
                       src={product.image_url || "/placeholder.svg"}
                       alt={product.name}
                       className="w-full h-full object-cover"
@@ -241,7 +241,7 @@ export default function TrendingCategories() {
             <Link key={product.id} href={`/products/${product.slug}`}>
               <div className="group cursor-pointer">
                 <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
-                  <Image
+                  <img
                     src={product.image_url || "/placeholder.svg"}
                     alt={product.name}
                     className="w-full h-full object-cover"
