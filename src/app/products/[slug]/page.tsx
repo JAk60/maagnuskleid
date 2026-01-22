@@ -42,30 +42,30 @@ export default function ProductDetailPage() {
     const [isAdding, setIsAdding] = useState(false);
     const [showSizeChart, setShowSizeChart] = useState(false);
 
-   useEffect(() => {
-    async function fetchProduct() {
-        console.log('🔥 FETCH RUNNING - slug:', slug);
-        console.log('🔥 Params:', params);
-        
-        try {
-            const allProducts = await getProducts();
-            console.log('📦 Got products:', allProducts.length);
-            
-            const productsWithSlugs = allProducts.map(addSlugToProduct);
-            const foundProduct = productsWithSlugs.find(p => p.slug === slug);
+    useEffect(() => {
+        async function fetchProduct() {
+            console.log('🔥 FETCH RUNNING - slug:', slug);
+            console.log('🔥 Params:', params);
 
-            console.log('🔍 Found product:', foundProduct ? 'YES' : 'NO');
-            console.log('🔍 Looking for slug:', slug);
-            
-            if (!foundProduct) {
-                console.log('❌ REDIRECTING - Product not found!');
-                router.push('/products');
-                return;
-            }
+            try {
+                const allProducts = await getProducts();
+                console.log('📦 Got products:', allProducts.length);
+
+                const productsWithSlugs = allProducts.map(addSlugToProduct);
+                const foundProduct = productsWithSlugs.find(p => p.slug === slug);
+
+                console.log('🔍 Found product:', foundProduct ? 'YES' : 'NO');
+                console.log('🔍 Looking for slug:', slug);
+
+                if (!foundProduct) {
+                    console.log('❌ REDIRECTING - Product not found!');
+                    router.push('/products');
+                    return;
+                }
 
                 setProduct(foundProduct);
 
-            setSelectedSize(foundProduct.sizes[0] || '');
+                setSelectedSize(foundProduct.sizes[0] || '');
                 const firstColor = foundProduct.colors[0];
                 const colorValue = typeof firstColor === 'string'
                     ? firstColor
@@ -287,7 +287,7 @@ export default function ProductDetailPage() {
                 </Link>
 
                 {/* Product Details */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+                <div className="z-30 grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
                     {/* Images */}
                     <div className="flex flex-col lg:flex-row gap-4">
                         {/* Thumbnail Gallery - Vertical on large screens */}

@@ -33,7 +33,7 @@ const Header = () => {
   const [show, setShow] = useState("translate-y-0");
   const [lastScrollY, setLastScrollY] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  
+
   // Dynamic categories state
   const [menCategories, setMenCategories] = useState<Array<{ id: string; name: string; url: string }>>([]);
   const [womenCategories, setWomenCategories] = useState<Array<{ id: string; name: string; url: string }>>([]);
@@ -47,11 +47,11 @@ const Header = () => {
     const fetchCategories = async () => {
       try {
         setCategoriesLoading(true);
-        
+
         // Fetch Male categories
         const menResponse = await fetch('/api/categories?gender=Male');
         const menData: ApiResponse = await menResponse.json();
-        
+
         // Fetch Female categories
         const womenResponse = await fetch('/api/categories?gender=Female');
         const womenData: ApiResponse = await womenResponse.json();
@@ -158,7 +158,7 @@ const Header = () => {
           <img
             src="/mk.png"
             alt="Maagnus Kleid"
-            className="h-120 mt-6 md:h-100 w-auto object-contain"
+            className="h-80  md:h-40 w-auto object-contain"
           />
         </Link>
 

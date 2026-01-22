@@ -116,7 +116,11 @@ export async function GET(request: Request) {
 
     console.log(`✅ Found ${productsWithDetails.length} products with images and size charts`);
 
-    return NextResponse.json(productsWithDetails, {
+    // ✅ WRAP RESPONSE PROPERLY
+    return NextResponse.json({
+      success: true,
+      data: productsWithDetails
+    }, {
       status: 200,
       headers: {
         'Cache-Control': 'no-store, must-revalidate'
@@ -126,13 +130,13 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('❌ Admin Products API Error:', error);
     
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : 'Failed to fetch products',
-        products: []
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch products',
+      data: [] // ✅ Include empty data array on error
+    }, { 
+      status: 500 
+    });
   }
 }
 

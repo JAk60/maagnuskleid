@@ -5,7 +5,7 @@ import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 
 /* -------------------------------------------------------------------------- */
-/*                                   Types                                    */
+/*                                   TYPES                                    */
 /* -------------------------------------------------------------------------- */
 
 type OrderStatus =
@@ -74,17 +74,24 @@ export async function GET(request: Request) {
     const { data: orders, error } = await query
     if (error) throw error
 
-    return NextResponse.json(orders ?? [], {
+    // ✅ WRAP RESPONSE PROPERLY
+    return NextResponse.json({
+      success: true,
+      data: orders ?? []
+    }, {
       status: 200,
       headers: { "Cache-Control": "no-store, must-revalidate" },
     })
   } catch (error: unknown) {
     console.error("❌ Admin Orders API Error:", error)
 
-    return NextResponse.json(
-      { error: getErrorMessage(error), orders: [] },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      success: false,
+      error: getErrorMessage(error),
+      data: [] // ✅ Include empty data array on error
+    }, { 
+      status: 500 
+    })
   }
 }
 

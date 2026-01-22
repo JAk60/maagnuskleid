@@ -1,5 +1,5 @@
 // app/api/admin/customers/route.ts
-// FIXED: Strict TypeScript, no `any`, ESLint clean
+// FIXED: Proper response wrapping
 
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
@@ -27,9 +27,9 @@ export async function GET() {
       console.error("❌ SUPABASE_SERVICE_ROLE_KEY not configured")
       return NextResponse.json(
         {
-          error:
-            "Admin credentials not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.",
-          customers: [],
+          success: false,
+          error: "Admin credentials not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.",
+          customers: []
         },
         { status: 500 }
       )
@@ -44,8 +44,9 @@ export async function GET() {
       console.error("❌ Error fetching users:", usersError)
       return NextResponse.json(
         {
+          success: false,
           error: `Failed to fetch users: ${usersError.message}`,
-          customers: [],
+          customers: []
         },
         { status: 500 }
       )
@@ -55,7 +56,11 @@ export async function GET() {
     console.log(`✅ Found ${users.length} auth users`)
 
     if (users.length === 0) {
-      return NextResponse.json([], {
+      // ✅ RETURN WRAPPED RESPONSE
+      return NextResponse.json({
+        success: true,
+        customers: []
+      }, {
         status: 200,
         headers: { "Cache-Control": "no-store, must-revalidate" },
       })
@@ -130,7 +135,11 @@ export async function GET() {
       `✅ Processed ${customersWithStats.length} customers with stats`
     )
 
-    return NextResponse.json(customersWithStats, {
+    // ✅ WRAP RESPONSE PROPERLY
+    return NextResponse.json({
+      success: true,
+      customers: customersWithStats
+    }, {
       status: 200,
       headers: { "Cache-Control": "no-store, must-revalidate" },
     })
@@ -147,13 +156,14 @@ export async function GET() {
         "Admin access requires SUPABASE_SERVICE_ROLE_KEY. Please add it to your .env.local file."
     }
 
-    return NextResponse.json(
-      {
-        error: errorMessage,
-        customers: [],
-        hint: "Make sure SUPABASE_SERVICE_ROLE_KEY is set in your .env.local file",
-      },
-      { status: 500 }
-    )
+    // ✅ RETURN WRAPPED ERROR RESPONSE
+    return NextResponse.json({
+      success: false,
+      error: errorMessage,
+      customers: [],
+      hint: "Make sure SUPABASE_SERVICE_ROLE_KEY is set in your .env.local file",
+    }, { 
+      status: 500 
+    })
   }
 }
