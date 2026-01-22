@@ -289,7 +289,6 @@ export default function CheckoutPage() {
           } else {
             setError(
               error.error?.description ||
-              error.description ||
               "Payment failed. Please try again or contact support."
             );
           }
