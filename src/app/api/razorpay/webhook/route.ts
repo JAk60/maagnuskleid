@@ -1,8 +1,7 @@
 
 
-import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { updateOrderPayment } from '@/lib/supabase-orders';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Webhook error:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },

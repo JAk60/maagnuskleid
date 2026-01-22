@@ -1,35 +1,51 @@
 // app/api/admin/logout/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { adminLogout } from '@/lib/admin-auth';
 
-export async function POST(request: NextRequest) {
+import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
+import { adminLogout } from "@/lib/admin-auth"
+
+/* -------------------------------------------------------------------------- */
+/*                                  Helpers                                   */
+/* -------------------------------------------------------------------------- */
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  return "Logout failed"
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    POST                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function POST() {
   try {
     // Get token from cookie
-    const cookieStore = cookies();
-    const token = (await cookieStore).get('admin_token')?.value;
+    const cookieStore = cookies()
+    const token = (await cookieStore).get("admin_token")?.value
 
     if (token) {
-      // Call the logout function to clean up session
-      await adminLogout(token);
+      // Clean up server-side session
+      await adminLogout(token)
     }
 
-    // Clear the cookie
-    const response = NextResponse.json({ success: true });
-    response.cookies.set('admin_token', '', {
+    // Clear cookie
+    const response = NextResponse.json({ success: true })
+    response.cookies.set("admin_token", "", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 0, // Expire immediately
-      path: '/',
-    });
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    })
 
-    return response;
-  } catch (error: any) {
-    console.error('Logout error:', error);
+    return response
+  } catch (error: unknown) {
+    console.error("Logout error:", error)
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: getErrorMessage(error) },
       { status: 500 }
-    );
+    )
   }
 }

@@ -1,78 +1,96 @@
 // app/api/admin/customers/[userId]/orders/route.ts
-// FIXED: Proper parameter handling and pagination
+// FIXED: Strict typing, no `any`, ESLint clean
 
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
+
+/* -------------------------------------------------------------------------- */
+/*                                Helpers                                     */
+/* -------------------------------------------------------------------------- */
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  return "Failed to fetch customer orders"
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   GET                                      */
+/* -------------------------------------------------------------------------- */
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ userId: string }> }
 ) {
   try {
-    // Await params in Next.js 15+
-    const params = await context.params;
-    const userId = params.userId;
-    
-    console.log(`📦 Fetching orders for user: ${userId}`);
+    // Next.js 15+ requires awaiting params
+    const { userId } = await context.params
 
-    // Get pagination params from URL
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const offset = (page - 1) * limit;
+    console.log(`📦 Fetching orders for user: ${userId}`)
 
-    // Get total count
-    const { count: totalCount } = await supabase
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+    /* ---------------------------- Pagination ---------------------------- */
 
-    console.log(`📊 Total orders for user: ${totalCount}`);
+    const { searchParams } = new URL(request.url)
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1))
+    const limit = Math.max(1, Number(searchParams.get("limit") ?? 10))
+    const offset = (page - 1) * limit
 
-    // Get paginated orders
+    /* --------------------------- Total Count ---------------------------- */
+
+    const { count: totalCount, error: countError } = await supabase
+      .from("orders")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+
+    if (countError) throw countError
+
+    /* --------------------------- Orders Page ---------------------------- */
+
     const { data: orders, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .from("orders")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1)
 
-    if (error) {
-      console.error('❌ Orders query error:', error);
-      throw error;
-    }
+    if (error) throw error
 
-    console.log(`✅ Found ${orders?.length || 0} orders for page ${page}`);
+    const total = totalCount ?? 0
 
-    return NextResponse.json({
-      orders: orders || [],
-      pagination: {
-        page,
-        limit,
-        total: totalCount || 0,
-        totalPages: Math.ceil((totalCount || 0) / limit),
-        hasMore: (offset + limit) < (totalCount || 0)
+    return NextResponse.json(
+      {
+        orders: orders ?? [],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasMore: offset + limit < total,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, must-revalidate",
+        },
       }
-    }, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-store, must-revalidate'
-      }
-    });
+    )
+  } catch (error: unknown) {
+    console.error("❌ Customer Orders API Error:", error)
 
-  } catch (error: any) {
-    console.error('❌ Customer Orders API Error:', error);
-    
-    return NextResponse.json({
-      orders: [],
-      error: error.message || 'Failed to fetch customer orders',
-      pagination: {
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 0,
-        hasMore: false
-      }
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        orders: [],
+        error: getErrorMessage(error),
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 0,
+          hasMore: false,
+        },
+      },
+      { status: 500 }
+    )
   }
 }

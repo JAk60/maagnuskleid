@@ -1,191 +1,199 @@
-// app/api/admin/orders/route.ts - FIXED WITH DELIVERY DATE
+// app/api/admin/orders/route.ts
+// STRICT + ESLINT CLEAN (WITH DELIVERY DATE FIX)
 
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
+
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
+
+type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+
+interface UpdateOrderBody {
+  id: string
+  order_status?: OrderStatus
+  shipped_at?: string
+  delivered_at?: string
+  [key: string]: unknown
+}
+
+interface BulkUpdateBody {
+  orderIds: string[]
+  order_status: OrderStatus
+}
+
+function isUpdateOrderBody(value: unknown): value is UpdateOrderBody {
+  return typeof value === "object" && value !== null && "id" in value
+}
+
+function isBulkUpdateBody(value: unknown): value is BulkUpdateBody {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "orderIds" in value &&
+    "order_status" in value
+  )
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  return "Unexpected server error"
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    GET                                     */
+/* -------------------------------------------------------------------------- */
 
 export async function GET(request: Request) {
   try {
-    console.log('📦 Admin Orders API called');
-
-    const { searchParams } = new URL(request.url);
-    const limit = searchParams.get('limit');
-    const status = searchParams.get('status');
+    const { searchParams } = new URL(request.url)
+    const limit = searchParams.get("limit")
+    const status = searchParams.get("status")
 
     let query = supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
 
-    if (status && status !== 'all') {
-      query = query.eq('order_status', status);
+    if (status && status !== "all") {
+      query = query.eq("order_status", status)
     }
 
     if (limit) {
-      query = query.limit(parseInt(limit));
+      query = query.limit(Number(limit))
     }
 
-    const { data: orders, error } = await query;
+    const { data: orders, error } = await query
+    if (error) throw error
 
-    if (error) {
-      console.error('❌ Orders query error:', error);
-      throw error;
-    }
-
-    console.log(`✅ Found ${orders?.length || 0} orders`);
-
-    return NextResponse.json(orders || [], {
+    return NextResponse.json(orders ?? [], {
       status: 200,
-      headers: {
-        'Cache-Control': 'no-store, must-revalidate'
-      }
-    });
+      headers: { "Cache-Control": "no-store, must-revalidate" },
+    })
+  } catch (error: unknown) {
+    console.error("❌ Admin Orders API Error:", error)
 
-  } catch (error: any) {
-    console.error('❌ Admin Orders API Error:', error);
-    
     return NextResponse.json(
-      {
-        error: error.message || 'Failed to fetch orders',
-        orders: []
-      },
+      { error: getErrorMessage(error), orders: [] },
       { status: 500 }
-    );
+    )
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                    PUT                                     */
+/* -------------------------------------------------------------------------- */
+
 export async function PUT(request: Request) {
   try {
-    console.log('✏️ Updating order...');
+    const rawBody = await request.json()
 
-    const body = await request.json();
-    const { id, order_status, ...otherUpdates } = body;
-
-    if (!id) {
+    if (!isUpdateOrderBody(rawBody)) {
       return NextResponse.json(
-        { error: 'Order ID is required' },
+        { error: "Invalid request body" },
         { status: 400 }
-      );
+      )
     }
 
-    // Prepare update object
-    const updates: any = {
-      ...otherUpdates,
-      updated_at: new Date().toISOString()
-    };
+    const { id, order_status, ...rest } = rawBody
 
-    // If order_status is provided, add it
+    const updates: Record<string, unknown> = {
+      ...rest,
+      updated_at: new Date().toISOString(),
+    }
+
     if (order_status) {
-      updates.order_status = order_status;
-    }
+      updates.order_status = order_status
 
-    // ✅ FIX: Automatically set timestamp fields based on status
-    if (order_status === 'shipped' && !updates.shipped_at) {
-      updates.shipped_at = new Date().toISOString();
-      console.log('✅ Set shipped_at timestamp');
-    }
+      if (order_status === "shipped" && !updates.shipped_at) {
+        updates.shipped_at = new Date().toISOString()
+      }
 
-    if (order_status === 'delivered' && !updates.delivered_at) {
-      updates.delivered_at = new Date().toISOString();
-      console.log('✅ Set delivered_at timestamp');
+      if (order_status === "delivered" && !updates.delivered_at) {
+        updates.delivered_at = new Date().toISOString()
+      }
     }
 
     const { data, error } = await supabase
-      .from('orders')
+      .from("orders")
       .update(updates)
-      .eq('id', id)
+      .eq("id", id)
       .select()
-      .single();
+      .single()
 
-    if (error) {
-      console.error('❌ Update order error:', error);
-      throw error;
-    }
-
-    console.log('✅ Order updated:', data.id);
-    console.log('Status:', data.order_status);
-    console.log('Delivered at:', data.delivered_at);
+    if (error) throw error
 
     return NextResponse.json(
       { success: true, order: data },
       { status: 200 }
-    );
+    )
+  } catch (error: unknown) {
+    console.error("❌ Update order error:", error)
 
-  } catch (error: any) {
-    console.error('❌ Update order error:', error);
-    
     return NextResponse.json(
-      { 
-        success: false,
-        error: error.message || 'Failed to update order' 
-      },
+      { success: false, error: getErrorMessage(error) },
       { status: 500 }
-    );
+    )
   }
 }
 
-// ========================================
-// BULK UPDATE STATUS (Optional - for admin efficiency)
-// ========================================
+/* -------------------------------------------------------------------------- */
+/*                                   PATCH                                    */
+/* -------------------------------------------------------------------------- */
 
 export async function PATCH(request: Request) {
   try {
-    const body = await request.json();
-    const { orderIds, order_status } = body;
+    const rawBody = await request.json()
 
-    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+    if (!isBulkUpdateBody(rawBody)) {
       return NextResponse.json(
-        { error: 'Order IDs array is required' },
+        { error: "Invalid bulk update payload" },
         { status: 400 }
-      );
+      )
     }
 
-    if (!order_status) {
-      return NextResponse.json(
-        { error: 'Order status is required' },
-        { status: 400 }
-      );
-    }
+    const { orderIds, order_status } = rawBody
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       order_status,
-      updated_at: new Date().toISOString()
-    };
-
-    // Set timestamp based on status
-    if (order_status === 'shipped') {
-      updates.shipped_at = new Date().toISOString();
+      updated_at: new Date().toISOString(),
     }
 
-    if (order_status === 'delivered') {
-      updates.delivered_at = new Date().toISOString();
+    if (order_status === "shipped") {
+      updates.shipped_at = new Date().toISOString()
     }
 
-    // Update all orders
+    if (order_status === "delivered") {
+      updates.delivered_at = new Date().toISOString()
+    }
+
     const { data, error } = await supabase
-      .from('orders')
+      .from("orders")
       .update(updates)
-      .in('id', orderIds)
-      .select();
+      .in("id", orderIds)
+      .select()
 
-    if (error) throw error;
-
-    console.log(`✅ Bulk updated ${data.length} orders to ${order_status}`);
+    if (error) throw error
 
     return NextResponse.json({
       success: true,
       updated: data.length,
-      orders: data
-    });
+      orders: data,
+    })
+  } catch (error: unknown) {
+    console.error("❌ Bulk update error:", error)
 
-  } catch (error: any) {
-    console.error('❌ Bulk update error:', error);
-    
     return NextResponse.json(
-      { 
-        success: false,
-        error: error.message || 'Failed to bulk update orders' 
-      },
+      { success: false, error: getErrorMessage(error) },
       { status: 500 }
-    );
+    )
   }
 }

@@ -1,69 +1,110 @@
-// app/api/cloudinary/delete/route.ts
+// app/api/admin/cloudinary/delete/route.ts
 
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server"
+import crypto from "crypto"
+
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
+
+interface DeleteRequestBody {
+  publicId: string
+}
+
+interface CloudinaryDeleteResponse {
+  result?: string
+  error?: {
+    message?: string
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  return "Failed to delete from Cloudinary"
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    POST                                    */
+/* -------------------------------------------------------------------------- */
 
 export async function POST(request: Request) {
   try {
-    const { publicId } = await request.json();
+    const body = (await request.json()) as unknown
 
-    if (!publicId) {
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      !("publicId" in body)
+    ) {
       return NextResponse.json(
-        { error: 'Public ID is required' },
+        { error: "Public ID is required" },
         { status: 400 }
-      );
+      )
     }
 
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    const { publicId } = body as DeleteRequestBody
+
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+    const apiKey = process.env.CLOUDINARY_API_KEY
+    const apiSecret = process.env.CLOUDINARY_API_SECRET
 
     if (!cloudName || !apiKey || !apiSecret) {
-      console.error('❌ Cloudinary credentials not configured');
+      console.error("❌ Cloudinary credentials not configured")
       return NextResponse.json(
-        { error: 'Cloudinary not configured' },
+        { error: "Cloudinary not configured" },
         { status: 500 }
-      );
+      )
     }
 
-    // Generate signature for deletion
-    const timestamp = Math.round(Date.now() / 1000);
-    const crypto = require('crypto');
-    
-    const signature = crypto
-      .createHash('sha1')
-      .update(`public_id=${publicId}&timestamp=${timestamp}${apiSecret}`)
-      .digest('hex');
+    /* --------------------------- Generate Signature -------------------------- */
 
-    // Delete from Cloudinary
-    const formData = new FormData();
-    formData.append('public_id', publicId);
-    formData.append('signature', signature);
-    formData.append('api_key', apiKey);
-    formData.append('timestamp', timestamp.toString());
+    const timestamp = Math.floor(Date.now() / 1000)
+
+    const signature = crypto
+      .createHash("sha1")
+      .update(`public_id=${publicId}&timestamp=${timestamp}${apiSecret}`)
+      .digest("hex")
+
+    /* ------------------------------ Delete Call ------------------------------ */
+
+    const formData = new FormData()
+    formData.append("public_id", publicId)
+    formData.append("signature", signature)
+    formData.append("api_key", apiKey)
+    formData.append("timestamp", String(timestamp))
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
       {
-        method: 'POST',
+        method: "POST",
         body: formData,
       }
-    );
+    )
 
-    const result = await response.json();
+    const result = (await response.json()) as CloudinaryDeleteResponse
 
-    if (result.result === 'ok') {
-      console.log('✅ Deleted from Cloudinary:', publicId);
-      return NextResponse.json({ success: true, result });
-    } else {
-      console.warn('⚠️ Cloudinary deletion response:', result);
-      return NextResponse.json({ success: false, result });
+    if (result.result === "ok") {
+      console.log("✅ Deleted from Cloudinary:", publicId)
+      return NextResponse.json({ success: true, result })
     }
 
-  } catch (error: any) {
-    console.error('❌ Cloudinary delete error:', error);
+    console.warn("⚠️ Cloudinary deletion response:", result)
+
     return NextResponse.json(
-      { error: error.message || 'Failed to delete from Cloudinary' },
+      {
+        success: false,
+        error: result.error?.message ?? "Deletion failed",
+        result,
+      },
+      { status: 400 }
+    )
+  } catch (error: unknown) {
+    console.error("❌ Cloudinary delete error:", error)
+
+    return NextResponse.json(
+      { error: getErrorMessage(error) },
       { status: 500 }
-    );
+    )
   }
 }

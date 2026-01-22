@@ -1,84 +1,128 @@
-// app/api/admin/shiprocket/create-order/route.ts - FIXED FOR BUILD
-import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
-import { createShipRocketOrder, generateAWBForOrder, schedulePickupForOrder } from '@/lib/shiprocket/orderService';
+// app/api/admin/shiprocket/create-order/route.ts
 
-// ✅ FIX: Lazy initialization
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { createClient } from "@supabase/supabase-js"
+import { NextRequest, NextResponse } from "next/server"
+import {
+  createShipRocketOrder,
+  generateAWBForOrder,
+  schedulePickupForOrder,
+} from "@/lib/shiprocket/orderService"
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
+/* -------------------------------------------------------------------------- */
+/*                                   TYPES                                    */
+/* -------------------------------------------------------------------------- */
 
-  return createClient(supabaseUrl, serviceRoleKey);
+type ShipRocketAction = "create" | "generate_awb" | "schedule_pickup"
+
+interface ShipRocketRequestBody {
+  orderId: string
+  action?: ShipRocketAction
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  return "ShipRocket request failed"
+}
+
+/* -------------------------------------------------------------------------- */
+/*                           SUPABASE (LAZY INIT)                              */
+/* -------------------------------------------------------------------------- */
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey)
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    POST                                    */
+/* -------------------------------------------------------------------------- */
+
 export async function POST(req: NextRequest) {
-  const supabase = getSupabaseClient(); // ✅ Create client here
+  const supabase = getSupabaseClient()
 
   try {
-    const { orderId, action = 'create' } = await req.json();
+    const rawBody = await req.json()
 
-    if (!orderId) {
+    if (!isObject(rawBody)) {
       return NextResponse.json(
-        { error: 'Order ID is required' },
+        { error: "Invalid request body" },
         { status: 400 }
-      );
+      )
     }
 
-    // TODO: Add admin authentication check here
-    // const isAdmin = await verifyAdminSession(req);
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
+    if (typeof rawBody.orderId !== "string") {
+      return NextResponse.json(
+        { error: "Order ID is required" },
+        { status: 400 }
+      )
+    }
 
-    let result;
+    const body = rawBody as unknown as ShipRocketRequestBody
+    const orderId = body.orderId
+    const action: ShipRocketAction = body.action ?? "create"
+
+    let result: unknown
 
     switch (action) {
-      case 'create':
-        result = await createShipRocketOrder(orderId);
-        break;
+      case "create": {
+        result = await createShipRocketOrder(orderId)
+        break
+      }
 
-      case 'generate_awb':
-        const { data: order } = await supabase
-          .from('orders')
-          .select('shiprocket_shipment_id')
-          .eq('id', orderId)
-          .single();
+      case "generate_awb": {
+        const { data: order, error } = await supabase
+          .from("orders")
+          .select("shiprocket_shipment_id")
+          .eq("id", orderId)
+          .single()
 
-        if (!order?.shiprocket_shipment_id) {
+        if (error || !order?.shiprocket_shipment_id) {
           return NextResponse.json(
-            { error: 'Shipment ID not found. Create order first.' },
+            { error: "Shipment ID not found. Create order first." },
             { status: 400 }
-          );
+          )
         }
 
-        result = await generateAWBForOrder(orderId, Number(order.shiprocket_shipment_id));
-        break;
+        result = await generateAWBForOrder(
+          orderId,
+          Number(order.shiprocket_shipment_id)
+        )
+        break
+      }
 
-      case 'schedule_pickup':
-        result = await schedulePickupForOrder(orderId);
-        break;
+      case "schedule_pickup": {
+        result = await schedulePickupForOrder(orderId)
+        break
+      }
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action' },
+          { error: "Invalid action" },
           { status: 400 }
-        );
+        )
     }
 
     return NextResponse.json({
       success: true,
       data: result,
-    });
+    })
+  } catch (error: unknown) {
+    console.error("Admin ShipRocket API error:", error)
 
-  } catch (error: any) {
-    console.error('Admin ShipRocket API error:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: getErrorMessage(error) },
       { status: 500 }
-    );
+    )
   }
 }

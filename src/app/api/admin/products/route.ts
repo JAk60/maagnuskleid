@@ -1,7 +1,43 @@
-// app/api/admin/products/route.ts - UPDATED WITH SHIPROCKET FIELDS
+// app/api/admin/products/route.ts - FIXED TYPE ERRORS
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+
+// Type definitions
+interface ProductImage {
+  image_url: string;
+  display_order?: number;
+  is_primary?: boolean;
+}
+
+interface SizeChartEntry {
+  size: string;
+  chest?: number | null;
+  length?: number | null;
+  bust?: number | null;
+  length_female?: number | null;
+  notes?: string;
+}
+
+interface ProductBody {
+  id?: number;
+  name: string;
+  description?: string;
+  price: number;
+  category: string;
+  gender: string;
+  stock: number;
+  sizes?: string[];
+  colors?: string[];
+  has_size_chart?: boolean;
+  images?: ProductImage[];
+  size_chart?: SizeChartEntry[];
+  weight?: number;
+  length?: number;
+  breadth?: number;
+  height?: number;
+  sku?: string;
+}
 
 // Helper function to delete image from Cloudinary
 async function deleteFromCloudinary(imageUrl: string) {
@@ -87,12 +123,12 @@ export async function GET(request: Request) {
       }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Admin Products API Error:', error);
     
     return NextResponse.json(
       {
-        error: error.message || 'Failed to fetch products',
+        error: error instanceof Error ? error.message : 'Failed to fetch products',
         products: []
       },
       { status: 500 }
@@ -104,9 +140,9 @@ export async function POST(request: Request) {
   try {
     console.log('📝 Creating new product...');
 
-    const body = await request.json();
+    const body = await request.json() as ProductBody;
     
-    const requiredFields = ['name', 'price', 'category', 'gender', 'stock'];
+    const requiredFields: (keyof ProductBody)[] = ['name', 'price', 'category', 'gender', 'stock'];
     const missingFields = requiredFields.filter(field => !body[field]);
     
     if (missingFields.length > 0) {
@@ -154,7 +190,7 @@ export async function POST(request: Request) {
     }
 
     // Use the primary image or first image as main image_url
-    const primaryImage = body.images.find((img: any) => img.is_primary) || body.images[0];
+    const primaryImage = body.images.find((img) => img.is_primary) || body.images[0];
 
     console.log('📸 Inserting product with images:', body.images.length);
     console.log('📦 ShipRocket details:', {
@@ -207,7 +243,7 @@ export async function POST(request: Request) {
 
     // Insert product images
     if (body.images && body.images.length > 0) {
-      const imagesToInsert = body.images.map((img: any, index: number) => ({
+      const imagesToInsert = body.images.map((img, index) => ({
         product_id: product.id,
         image_url: img.image_url,
         display_order: img.display_order ?? index,
@@ -229,7 +265,7 @@ export async function POST(request: Request) {
 
     // Insert size chart if provided
     if (body.has_size_chart && body.size_chart && body.size_chart.length > 0) {
-      const sizeChartToInsert = body.size_chart.map((chart: any) => ({
+      const sizeChartToInsert = body.size_chart.map((chart) => ({
         product_id: product.id,
         size: chart.size,
         chest: chart.chest || null,
@@ -257,13 +293,13 @@ export async function POST(request: Request) {
       { status: 201 }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Create product error:', error);
     
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || 'Failed to create product' 
+        error: error instanceof Error ? error.message : 'Failed to create product' 
       },
       { status: 500 }
     );
@@ -274,7 +310,7 @@ export async function PUT(request: Request) {
   try {
     console.log('✏️ Updating product...');
 
-    const body = await request.json();
+    const body = await request.json() as ProductBody;
     const { id, images, size_chart, has_size_chart, ...updates } = body;
 
     if (!id) {
@@ -318,12 +354,12 @@ export async function PUT(request: Request) {
 
     // Update primary image_url if images are provided
     if (images && images.length > 0) {
-      const primaryImage = images.find((img: any) => img.is_primary) || images[0];
-      updates.image_url = primaryImage.image_url;
+      const primaryImage = images.find((img) => img.is_primary) || images[0];
+      (updates as Record<string, unknown>).image_url = primaryImage.image_url;
     }
 
     // Update has_size_chart flag
-    updates.has_size_chart = has_size_chart || false;
+    (updates as Record<string, unknown>).has_size_chart = has_size_chart || false;
 
     console.log('📦 Updating ShipRocket fields:', {
       weight: updates.weight,
@@ -366,7 +402,7 @@ export async function PUT(request: Request) {
 
       // Delete old images from Cloudinary (optional)
       if (oldImages && oldImages.length > 0) {
-        const newImageUrls = images.map((img: any) => img.image_url);
+        const newImageUrls = images.map((img) => img.image_url);
         const imagesToDelete = oldImages.filter(
           (oldImg) => !newImageUrls.includes(oldImg.image_url)
         );
@@ -378,7 +414,7 @@ export async function PUT(request: Request) {
 
       // Insert new images
       if (images.length > 0) {
-        const imagesToInsert = images.map((img: any, index: number) => ({
+        const imagesToInsert = images.map((img, index) => ({
           product_id: id,
           image_url: img.image_url,
           display_order: img.display_order ?? index,
@@ -411,7 +447,7 @@ export async function PUT(request: Request) {
 
       // Insert new size chart if enabled
       if (has_size_chart && size_chart && size_chart.length > 0) {
-        const sizeChartToInsert = size_chart.map((chart: any) => ({
+        const sizeChartToInsert = size_chart.map((chart) => ({
           product_id: id,
           size: chart.size,
           chest: chart.chest || null,
@@ -440,13 +476,13 @@ export async function PUT(request: Request) {
       { status: 200 }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Update product error:', error);
     
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || 'Failed to update product' 
+        error: error instanceof Error ? error.message : 'Failed to update product' 
       },
       { status: 500 }
     );
@@ -499,13 +535,13 @@ export async function DELETE(request: Request) {
       { status: 200 }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Delete product error:', error);
     
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || 'Failed to delete product' 
+        error: error instanceof Error ? error.message : 'Failed to delete product' 
       },
       { status: 500 }
     );

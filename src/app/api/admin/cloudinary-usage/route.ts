@@ -1,122 +1,153 @@
 // app/api/admin/cloudinary-usage/route.ts
 
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server"
+
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
+
+interface CloudinaryUsage {
+  resources?: number
+  plan?: string
+  storage?: {
+    usage?: number
+  }
+  bandwidth?: {
+    usage?: number
+  }
+  transformations?: {
+    usage?: number
+  }
+}
+
+function isCloudinaryUsage(data: unknown): data is CloudinaryUsage {
+  return typeof data === "object" && data !== null
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    GET                                     */
+/* -------------------------------------------------------------------------- */
 
 export async function GET() {
   try {
-    console.log('📊 Cloudinary Usage API called');
+    console.log("📊 Cloudinary Usage API called")
 
-    // Check if credentials are configured
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-    console.log('Cloudinary config check:', {
-      cloudName: cloudName ? '✓ Set' : '✗ Missing',
-      apiKey: apiKey ? '✓ Set' : '✗ Missing',
-      apiSecret: apiSecret ? '✓ Set' : '✗ Missing'
-    });
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+    const apiKey = process.env.CLOUDINARY_API_KEY
+    const apiSecret = process.env.CLOUDINARY_API_SECRET
 
     if (!cloudName || !apiKey || !apiSecret) {
-      console.warn('⚠️ Cloudinary credentials not configured');
       return NextResponse.json({
         success: true,
-        message: 'Cloudinary not configured. Add credentials to .env.local',
+        message: "Cloudinary not configured",
         data: {
           images: { used: 0, limit: 25000 },
           storage: { used: 0, limit: 25 },
           bandwidth: { used: 0, limit: 25 },
-          transformations: { used: 0, limit: 25000 }
-        }
-      });
+          transformations: { used: 0, limit: 25000 },
+        },
+      })
     }
 
-    // Use Cloudinary Admin API
-    // Note: We need to use Basic Auth
-    const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
-    
-    console.log('Calling Cloudinary API...');
+    /* ----------------------------- API Request ------------------------------ */
+
+    const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")
+
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/usage`,
       {
         headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/json",
+        },
       }
-    );
+    )
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Cloudinary API error:', response.status, errorText);
-      throw new Error(`Cloudinary API returned ${response.status}: ${errorText}`);
+      const text = await response.text()
+      throw new Error(`Cloudinary API ${response.status}: ${text}`)
     }
 
-    const usage = await response.json();
-    console.log('✅ Cloudinary API response received');
+    const rawUsage = await response.json()
 
-    // Free tier limits
+    if (!isCloudinaryUsage(rawUsage)) {
+      throw new Error("Invalid Cloudinary usage response")
+    }
+
+    const usage = rawUsage
+
+    /* ------------------------------ Constants ------------------------------- */
+
     const FREE_TIER_LIMITS = {
-      credits: 25,
+      images: 25000,
       storage: 25, // GB
-      bandwidth: 25, // GB per month
+      bandwidth: 25, // GB
       transformations: 25000,
-      images: 25000
-    };
+    }
 
-    // Calculate usage
-    const storageUsedGB = (usage.storage?.usage || 0) / (1024 * 1024 * 1024);
-    const bandwidthUsedGB = (usage.bandwidth?.usage || 0) / (1024 * 1024 * 1024);
-    
+    /* ---------------------------- Calculations ------------------------------ */
+
+    const storageUsedGB =
+      (usage.storage?.usage ?? 0) / (1024 * 1024 * 1024)
+
+    const bandwidthUsedGB =
+      (usage.bandwidth?.usage ?? 0) / (1024 * 1024 * 1024)
+
     const data = {
       images: {
-        used: usage.resources || 0,
+        used: usage.resources ?? 0,
         limit: FREE_TIER_LIMITS.images,
-        percentage: ((usage.resources || 0) / FREE_TIER_LIMITS.images) * 100
+        percentage:
+          ((usage.resources ?? 0) / FREE_TIER_LIMITS.images) * 100,
       },
       storage: {
-        used: parseFloat(storageUsedGB.toFixed(2)),
+        used: Number(storageUsedGB.toFixed(2)),
         limit: FREE_TIER_LIMITS.storage,
-        percentage: (storageUsedGB / FREE_TIER_LIMITS.storage) * 100
+        percentage:
+          (storageUsedGB / FREE_TIER_LIMITS.storage) * 100,
       },
       bandwidth: {
-        used: parseFloat(bandwidthUsedGB.toFixed(2)),
+        used: Number(bandwidthUsedGB.toFixed(2)),
         limit: FREE_TIER_LIMITS.bandwidth,
-        percentage: (bandwidthUsedGB / FREE_TIER_LIMITS.bandwidth) * 100
+        percentage:
+          (bandwidthUsedGB / FREE_TIER_LIMITS.bandwidth) * 100,
       },
       transformations: {
-        used: usage.transformations?.usage || 0,
+        used: usage.transformations?.usage ?? 0,
         limit: FREE_TIER_LIMITS.transformations,
-        percentage: ((usage.transformations?.usage || 0) / FREE_TIER_LIMITS.transformations) * 100
+        percentage:
+          ((usage.transformations?.usage ?? 0) /
+            FREE_TIER_LIMITS.transformations) *
+          100,
       },
-      plan: usage.plan || 'free',
-      lastUpdated: new Date().toISOString()
-    };
-
-    console.log('✅ Cloudinary usage calculated:', data);
+      plan: usage.plan ?? "free",
+      lastUpdated: new Date().toISOString(),
+    }
 
     return NextResponse.json({
       success: true,
-      data
-    });
+      data,
+    })
+  } catch (error: unknown) {
+    console.error("❌ Cloudinary Usage API Error:", error)
 
-  } catch (error) {
-    console.error('❌ Cloudinary Usage API Error:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch Cloudinary usage';
-    
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch Cloudinary usage"
+
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage,
+        error: message,
         data: {
           images: { used: 0, limit: 25000 },
           storage: { used: 0, limit: 25 },
           bandwidth: { used: 0, limit: 25 },
-          transformations: { used: 0, limit: 25000 }
-        }
+          transformations: { used: 0, limit: 25000 },
+        },
       },
-      { status: 200 } // Return 200 even on error so dashboard doesn't break
-    );
+      { status: 200 } // keep dashboard safe
+    )
   }
 }
