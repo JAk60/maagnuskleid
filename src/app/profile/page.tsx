@@ -75,7 +75,6 @@ export default function ProfilePage() {
         await createAddress({
           ...addressForm,
           user_id: user!.id,
-          email: ""
         })
       }
       
