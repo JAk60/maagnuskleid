@@ -315,6 +315,11 @@ export async function createShipRocketOrder(orderId: string) {
 
     console.log(`✅ ShipRocket order created successfully: ${shipRocketResponse.order_id}`);
 
+    // ✅ FIX: Don't auto-generate AWB immediately
+    // ShipRocket needs a few seconds to process the order before AWB can be generated
+    // Let admin manually click "Generate AWB" button, or we can add delay here
+    console.log('ℹ️ AWB generation skipped - admin can generate manually via button');
+
     return {
       success: true,
       shiprocket_order_id: shipRocketResponse.order_id,
