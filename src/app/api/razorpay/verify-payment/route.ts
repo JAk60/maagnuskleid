@@ -1,12 +1,13 @@
 // ========================================
 // app/api/razorpay/verify-payment/route.ts
-// STRICT + ESLINT CLEAN (NO any, NO unsafe unknown)
+// PRODUCTION READY - ShipRocket Auto-Creation
 // ========================================
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyRazorpaySignature } from "@/lib/razorpay"
 import { updateOrderPayment } from "@/lib/supabase-orders"
 import { rateLimit, getClientIdentifier } from "@/lib/rate-limit"
+import { createShipRocketOrder } from "@/lib/shiprocket/orderService"
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     const rateLimitResult = rateLimit(`verify:${identifier}`, {
       limit: 10,
-      windowMs: 5 * 60 * 1000, // 5 minutes
+      windowMs: 5 * 60 * 1000,
     })
 
     if (!rateLimitResult.success) {
@@ -120,6 +121,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log("✅ Payment signature verified for order:", order_id)
+
     /* --------------------------- UPDATE ORDER ----------------------------- */
 
     const paymentUpdate: PaymentUpdatePayload = {
@@ -130,16 +133,62 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const updatedOrder = await updateOrderPayment(
-        order_id,
-        paymentUpdate
-      )
+      const updatedOrder = await updateOrderPayment(order_id, paymentUpdate)
 
-      return NextResponse.json({
-        success: true,
-        message: "Payment verified successfully",
-        order: updatedOrder,
-      })
+      console.log("💰 Order marked as PAID:", order_id)
+
+      /* ----------------------- CREATE SHIPROCKET ORDER ---------------------- */
+
+      try {
+        console.log("🚀 Attempting ShipRocket order creation...")
+        
+        const shipRocketResult = await createShipRocketOrder(order_id)
+
+        if (shipRocketResult.success) {
+          console.log(
+            "✅ ShipRocket order created:",
+            shipRocketResult.shiprocket_order_id
+          )
+
+          return NextResponse.json({
+            success: true,
+            message: "Payment verified and shipping order created successfully",
+            order: updatedOrder,
+            shiprocket: {
+              order_id: shipRocketResult.shiprocket_order_id,
+              shipment_id: shipRocketResult.shiprocket_shipment_id,
+            },
+          })
+        } else {
+          console.warn("⚠️ ShipRocket order already exists or failed")
+
+          return NextResponse.json({
+            success: true,
+            message: "Payment verified successfully",
+            order: updatedOrder,
+            shiprocket: {
+              note: "ShipRocket order will be created shortly or already exists",
+            },
+          })
+        }
+      } catch (shipRocketError: unknown) {
+        const errorMsg =
+          shipRocketError instanceof Error
+            ? shipRocketError.message
+            : "ShipRocket creation failed"
+
+        console.error("❌ ShipRocket error:", errorMsg)
+
+        // Payment succeeded, so we still return success
+        // Admin can manually create shipping order later
+        return NextResponse.json({
+          success: true,
+          message:
+            "Payment verified successfully. Shipping order will be created shortly.",
+          order: updatedOrder,
+          warning: "ShipRocket order creation pending - check admin panel",
+        })
+      }
     } catch (dbError: unknown) {
       console.error("❌ Database update error:", dbError)
 

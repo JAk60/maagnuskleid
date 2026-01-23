@@ -17,6 +17,7 @@ interface Customer {
   last_order_date?: string;
 }
 interface CustomersApiResponse {
+  success: boolean;
   customers?: Customer[];
   error?: string;
 }
@@ -65,7 +66,7 @@ export default function CustomersManagement() {
     fetchCustomers();
   }, []);
 
-   const fetchCustomers = async () => {
+  const fetchCustomers = async () => {
     try {
       setLoading(true);
       setError('');
@@ -77,20 +78,25 @@ export default function CustomersManagement() {
 
       const data = (await response.json()) as CustomersApiResponse;
 
+      // ✅ CHECK SUCCESS FIRST
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch customers');
+      }
+
+      // ✅ THEN ACCESS CUSTOMERS
       if (!Array.isArray(data.customers)) {
-        throw new Error(data.error || 'Invalid customers data');
+        throw new Error('Invalid customers data format');
       }
 
       setCustomers(data.customers);
     } catch (err) {
-      console.error(err);
+      console.error('❌ Fetch customers error:', err);
       setCustomers([]);
       setError(err instanceof Error ? err.message : 'Failed to load customers');
     } finally {
       setLoading(false);
     }
   };
-
   const fetchCustomerOrders = async (userId: string, page = 1) => {
     try {
       setOrdersLoading(true);
@@ -130,11 +136,11 @@ export default function CustomersManagement() {
   };
 
   // Customer pagination
-  const filteredCustomers = Array.isArray(customers) 
+  const filteredCustomers = Array.isArray(customers)
     ? customers.filter(customer =>
-        customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.name?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : [];
 
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
@@ -182,7 +188,7 @@ export default function CustomersManagement() {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           <p className="font-semibold">Error loading customers</p>
           <p className="text-sm">{error}</p>
-          <button 
+          <button
             onClick={fetchCustomers}
             className="mt-2 text-sm underline hover:no-underline"
           >
@@ -342,7 +348,7 @@ export default function CustomersManagement() {
                 </span>{' '}
                 of <span className="font-medium">{filteredCustomers.length}</span> customers
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => goToPage(currentPage - 1)}
@@ -351,7 +357,7 @@ export default function CustomersManagement() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                
+
                 <div className="flex gap-1">
                   {[...Array(totalPages)].map((_, idx) => {
                     const page = idx + 1;
@@ -365,11 +371,10 @@ export default function CustomersManagement() {
                         <button
                           key={page}
                           onClick={() => goToPage(page)}
-                          className={`px-3 py-1 border rounded-md ${
-                            currentPage === page
+                          className={`px-3 py-1 border rounded-md ${currentPage === page
                               ? 'bg-blue-600 text-white border-blue-600'
                               : 'border-gray-300 hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           {page}
                         </button>
@@ -383,7 +388,7 @@ export default function CustomersManagement() {
                     return null;
                   })}
                 </div>
-                
+
                 <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}

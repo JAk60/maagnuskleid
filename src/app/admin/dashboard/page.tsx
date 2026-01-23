@@ -26,6 +26,7 @@ import AnalyticsPage from '../AnalyticsPage';
 import CategoryManagement from '../CategoriesManagement';
 import ExchangeManagement from '../ExchangeManagement';
 import StockAlerts from '../StockAlerts';
+import ShipRocketManagement from '../shiprocketmanage';
 export default function AdminDashboard() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -41,6 +42,7 @@ export default function AdminDashboard() {
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'categories', label: 'Categories', icon: BarChart3 },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'shiprocket', label: 'ShipRocket', icon: BarChart3 },
     { id: 'stocks', label: 'Stock Alerts', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -81,6 +83,8 @@ export default function AdminDashboard() {
         return <CategoryManagement />;
       case 'analytics':
         return <AnalyticsPage />;
+      case 'shiprocket':
+        return <ShipRocketManagement />;
       case 'stocks':
         return <StockAlerts />;
       case 'settings':
@@ -142,8 +146,8 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => setActiveMenu(item.id)}
                     className={`flex items-center w-full p-3 rounded-lg transition-colors ${isActive
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-700 hover:bg-gray-100'
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-700 hover:bg-gray-100'
                       }`}
                   >
                     <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`} />
@@ -155,7 +159,7 @@ export default function AdminDashboard() {
           </ul>
 
           <div className="pt-4 mt-4 border-t border-gray-200">
-            <button 
+            <button
               onClick={handleLogout}
               className="flex items-center w-full p-3 text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors"
             >

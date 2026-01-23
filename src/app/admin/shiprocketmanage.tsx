@@ -26,6 +26,15 @@ interface Order {
     pickup_scheduled_date?: string;
 }
 
+interface ShipRocketLog {
+    id: string;
+    order_id: string;
+    action: string;
+    status: string;
+    error_message?: string;
+    created_at: string;
+}
+
 interface ShipRocketActionResponse {
     success: boolean;
     error?: string;
@@ -33,9 +42,12 @@ interface ShipRocketActionResponse {
 
 export default function ShipRocketManagement() {
     const [orders, setOrders] = useState<Order[]>([]);
+    const [logs, setLogs] = useState<ShipRocketLog[]>([]);
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [filter, setFilter] = useState('all');
+    const [showLogs, setShowLogs] = useState(false);
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -63,6 +75,21 @@ export default function ShipRocketManagement() {
         }
     }, [filter]);
 
+    const fetchLogs = useCallback(async (orderId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('shiprocket_logs')
+                .select('*')
+                .eq('order_id', orderId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setLogs(data || []);
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchOrders();
     }, [fetchOrders]);
@@ -89,6 +116,12 @@ export default function ShipRocketManagement() {
         } finally {
             setProcessing(false);
         }
+    };
+
+    const viewLogs = async (orderId: string) => {
+        setSelectedOrderId(orderId);
+        await fetchLogs(orderId);
+        setShowLogs(true);
     };
 
     const getStatusBadge = (order: Order) => {
@@ -236,6 +269,12 @@ export default function ShipRocketManagement() {
                                                             Schedule Pickup
                                                         </button>
                                                     )}
+                                                    <button
+                                                        onClick={() => viewLogs(order.id)}
+                                                        className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs font-medium"
+                                                    >
+                                                        View Logs
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -271,6 +310,47 @@ export default function ShipRocketManagement() {
                         </div>
                     </div>
                 </div>
+
+                {/* Logs Modal */}
+                {showLogs && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                            <div className="p-6 border-b border-gray-200">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-xl font-bold text-gray-900">ShipRocket Logs</h2>
+                                    <button
+                                        onClick={() => setShowLogs(false)}
+                                        className="text-gray-400 hover:text-gray-600"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
+                                {logs.length === 0 ? (
+                                    <p className="text-gray-500 text-center">No logs found for this order</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {logs.map((log) => (
+                                            <div key={log.id} className="border border-gray-200 rounded-lg p-4">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-sm font-medium text-gray-900">{log.action}</span>
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'success' ? 'bg-green-100 text-green-800' : log.status === 'error' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                        {log.status}
+                                                    </span>
+                                                </div>
+                                                {log.error_message && (
+                                                    <p className="text-sm text-red-600 mb-2">{log.error_message}</p>
+                                                )}
+                                                <p className="text-xs text-gray-500">{new Date(log.created_at).toLocaleString()}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
