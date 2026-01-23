@@ -214,7 +214,7 @@ export async function createShipRocketOrder(orderId: string) {
       weight: dimensions.weight,
     };
 
-    console.log('📦 ShipRocket payload prepared');
+    console.log('📦 ShipRocket payload prepared:', JSON.stringify(payload, null, 2));
 
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
@@ -223,17 +223,52 @@ export async function createShipRocketOrder(orderId: string) {
       status: 'pending',
     });
 
-    const shipRocketResponse = await shipRocketClient.createOrder(payload);
-
-    console.log('✅ ShipRocket API response received:', shipRocketResponse);
+    let shipRocketResponse;
+    
+    try {
+      shipRocketResponse = await shipRocketClient.createOrder(payload);
+      console.log('✅ ShipRocket API response received:', JSON.stringify(shipRocketResponse, null, 2));
+    } catch (apiError: unknown) {
+      const errorMsg = apiError instanceof Error ? apiError.message : JSON.stringify(apiError);
+      
+      await supabase.from('shiprocket_logs').insert({
+        order_id: orderId,
+        action: 'create_order_api_error',
+        request_payload: payload,
+        response_payload: apiError,
+        status: 'error',
+        error_message: `ShipRocket API call failed: ${errorMsg}`,
+      });
+      
+      throw new Error(`ShipRocket API call failed: ${errorMsg}`);
+    }
 
     // ✅ FIX: Add null checks before toString()
     if (!shipRocketResponse || typeof shipRocketResponse.order_id === 'undefined') {
-      throw new Error('ShipRocket API returned invalid response - missing order_id');
+      // Log the full response to database for debugging
+      await supabase.from('shiprocket_logs').insert({
+        order_id: orderId,
+        action: 'create_order_failed',
+        request_payload: payload,
+        response_payload: shipRocketResponse,
+        status: 'error',
+        error_message: `ShipRocket returned invalid response. Full response: ${JSON.stringify(shipRocketResponse)}`,
+      });
+      
+      throw new Error(`ShipRocket returned invalid response. Full response: ${JSON.stringify(shipRocketResponse)}`);
     }
 
     if (typeof shipRocketResponse.shipment_id === 'undefined') {
-      throw new Error('ShipRocket API returned invalid response - missing shipment_id');
+      await supabase.from('shiprocket_logs').insert({
+        order_id: orderId,
+        action: 'create_order_no_shipment',
+        request_payload: payload,
+        response_payload: shipRocketResponse,
+        status: 'error',
+        error_message: `ShipRocket returned order_id but no shipment_id. Response: ${JSON.stringify(shipRocketResponse)}`,
+      });
+      
+      throw new Error(`ShipRocket returned order_id but no shipment_id. Response: ${JSON.stringify(shipRocketResponse)}`);
     }
 
     const { error: updateError } = await supabase

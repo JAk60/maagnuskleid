@@ -1,4 +1,4 @@
-// ShipRocket API Client with Authentication
+// ShipRocket API Client with Authentication - ENHANCED ERROR HANDLING
 
 import {
   ShipRocketAuthResponse,
@@ -11,7 +11,6 @@ import {
   ShipRocketError,
 } from './types';
 
-// Add new type definitions for responses
 interface CourierServiceabilityResponse {
   available_courier_companies: Array<{
     courier_company_id: number;
@@ -49,7 +48,7 @@ class ShipRocketClient {
     this.password = process.env.SHIPROCKET_PASSWORD || '';
 
     if (!this.email || !this.password) {
-      console.error('ShipRocket credentials not found in environment variables');
+      console.error('❌ ShipRocket credentials not found in environment variables');
     }
   }
 
@@ -58,6 +57,8 @@ class ShipRocketClient {
    */
   private async authenticate(): Promise<string> {
     try {
+      console.log('🔐 Authenticating with ShipRocket...');
+      
       const response = await fetch(`${this.baseURL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -69,21 +70,26 @@ class ShipRocketClient {
         }),
       });
 
+      const data: unknown = await response.json();
+
       if (!response.ok) {
-        const error = (await response.json()) as { message?: string };
-        throw new Error(`Authentication failed: ${error.message || response.statusText}`);
+        const error = data as { message?: string; errors?: unknown };
+        const errorMsg = error.message || JSON.stringify(data);
+        console.error('❌ ShipRocket authentication failed:', errorMsg);
+        throw new Error(`Authentication failed: ${errorMsg}`);
       }
 
-      const data: ShipRocketAuthResponse = await response.json();
-      this.token = data.token;
+      const authData = data as ShipRocketAuthResponse;
+      this.token = authData.token;
       
       // Token expires in 10 days, set expiry to 9 days to be safe
       this.tokenExpiry = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000);
       
-      console.log('ShipRocket authentication successful');
-      return data.token;
+      console.log('✅ ShipRocket authentication successful');
+      return authData.token;
     } catch (error) {
-      console.error('ShipRocket authentication error:', error instanceof Error ? error.message : 'Unknown error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ ShipRocket authentication error:', errorMsg);
       throw error;
     }
   }
@@ -92,7 +98,6 @@ class ShipRocketClient {
    * Get valid token (authenticate if needed)
    */
   private async getToken(): Promise<string> {
-    // If no token or expired, authenticate
     if (!this.token || !this.tokenExpiry || new Date() >= this.tokenExpiry) {
       return await this.authenticate();
     }
@@ -108,6 +113,8 @@ class ShipRocketClient {
   ): Promise<T> {
     const token = await this.getToken();
 
+    console.log(`📡 ShipRocket API Request: ${options.method || 'GET'} ${endpoint}`);
+
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       ...options,
       headers: {
@@ -117,12 +124,35 @@ class ShipRocketClient {
       },
     });
 
-    const data: unknown = await response.json();
+    const rawData = await response.text();
+    console.log(`📥 ShipRocket Response Status: ${response.status}`);
+    console.log(`📥 ShipRocket Response Body:`, rawData);
+
+    let data: unknown;
+    try {
+      data = JSON.parse(rawData);
+    } catch (parseError) {
+      console.error('❌ Failed to parse ShipRocket response as JSON:', rawData);
+      throw new Error(`Invalid JSON response from ShipRocket: ${rawData.substring(0, 200)}`);
+    }
 
     if (!response.ok) {
       const error = data as ShipRocketError;
-      console.error('ShipRocket API error:', error);
-      throw new Error(error.message || 'ShipRocket API request failed');
+      const errorMsg = error.message || JSON.stringify(error);
+      
+      console.error('❌ ShipRocket API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: error,
+        message: errorMsg,
+      });
+
+      // Include error details in the thrown error
+      if (error.errors) {
+        throw new Error(`ShipRocket API Error: ${errorMsg} | Details: ${JSON.stringify(error.errors)}`);
+      }
+      
+      throw new Error(`ShipRocket API Error (${response.status}): ${errorMsg}`);
     }
 
     return data as T;
@@ -135,6 +165,9 @@ class ShipRocketClient {
     payload: ShipRocketCreateOrderPayload
   ): Promise<ShipRocketCreateOrderResponse> {
     try {
+      console.log('📦 Creating ShipRocket order...');
+      console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+      
       const response = await this.request<ShipRocketCreateOrderResponse>(
         '/orders/create/adhoc',
         {
@@ -143,10 +176,11 @@ class ShipRocketClient {
         }
       );
 
-      console.log('ShipRocket order created:', response);
+      console.log('✅ ShipRocket order created successfully:', response);
       return response;
     } catch (error) {
-      console.error('Failed to create ShipRocket order:', error);
+      const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('❌ Failed to create ShipRocket order:', errorMsg);
       throw error;
     }
   }
@@ -158,6 +192,8 @@ class ShipRocketClient {
     payload: ShipRocketGenerateAWBPayload
   ): Promise<ShipRocketGenerateAWBResponse> {
     try {
+      console.log('🎫 Generating AWB...');
+      
       const response = await this.request<ShipRocketGenerateAWBResponse>(
         '/courier/assign/awb',
         {
@@ -166,10 +202,10 @@ class ShipRocketClient {
         }
       );
 
-      console.log('AWB generated:', response);
+      console.log('✅ AWB generated:', response);
       return response;
     } catch (error) {
-      console.error('Failed to generate AWB:', error);
+      console.error('❌ Failed to generate AWB:', error);
       throw error;
     }
   }
@@ -181,15 +217,17 @@ class ShipRocketClient {
     payload: ShipRocketPickupSchedulePayload
   ): Promise<PickupScheduleResponse> {
     try {
+      console.log('📅 Scheduling pickup...');
+      
       const response = await this.request<PickupScheduleResponse>('/courier/generate/pickup', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
 
-      console.log('Pickup scheduled:', response);
+      console.log('✅ Pickup scheduled:', response);
       return response;
     } catch (error) {
-      console.error('Failed to schedule pickup:', error);
+      console.error('❌ Failed to schedule pickup:', error);
       throw error;
     }
   }
@@ -208,7 +246,7 @@ class ShipRocketClient {
 
       return response;
     } catch (error) {
-      console.error('Failed to track shipment:', error);
+      console.error('❌ Failed to track shipment:', error);
       throw error;
     }
   }
@@ -232,7 +270,7 @@ class ShipRocketClient {
 
       return response;
     } catch (error) {
-      console.error('Failed to get available couriers:', error);
+      console.error('❌ Failed to get available couriers:', error);
       throw error;
     }
   }
@@ -247,10 +285,10 @@ class ShipRocketClient {
         body: JSON.stringify({ ids: shipmentIds }),
       });
 
-      console.log('Shipment cancelled:', response);
+      console.log('✅ Shipment cancelled:', response);
       return response;
     } catch (error) {
-      console.error('Failed to cancel shipment:', error);
+      console.error('❌ Failed to cancel shipment:', error);
       throw error;
     }
   }
