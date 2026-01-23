@@ -95,8 +95,7 @@ export default function CheckoutPage() {
     try {
       const newAddress = await createAddress({
         ...addressForm,
-        user_id: user!.id,
-        email: ""
+        user_id: user!.id
       })
       setAddresses(prev => [...prev, newAddress])
       setSelectedAddress(newAddress)
@@ -222,7 +221,7 @@ export default function CheckoutPage() {
           orderId: razorpayOrder.id,
           amount: razorpayOrder.amount,
           currency: razorpayOrder.currency,
-          name: "genzquicks",
+          name: "Maagnus kleid",
           description: `Order #${order.order_number}`,
           prefill: {
             name: `${selectedAddress.first_name} ${selectedAddress.last_name}`,
