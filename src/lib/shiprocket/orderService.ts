@@ -146,7 +146,7 @@ export async function createShipRocketOrder(orderId: string) {
   const supabase = getSupabaseClient();
 
   try {
-    console.log(`Creating ShipRocket order for: ${orderId}`);
+    console.log(`🚀 Creating ShipRocket order for: ${orderId}`);
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -159,7 +159,7 @@ export async function createShipRocketOrder(orderId: string) {
     }
 
     if (order.shiprocket_order_id) {
-      console.log(`Order already synced to ShipRocket: ${order.shiprocket_order_id}`);
+      console.log(`✅ Order already synced to ShipRocket: ${order.shiprocket_order_id}`);
       return {
         success: true,
         message: 'Order already synced',
@@ -169,6 +169,14 @@ export async function createShipRocketOrder(orderId: string) {
 
     const shippingAddress = order.shipping_address;
     const items = order.items;
+
+    if (!items || items.length === 0) {
+      throw new Error('Order has no items');
+    }
+
+    if (!shippingAddress || !shippingAddress.first_name || !shippingAddress.phone) {
+      throw new Error('Invalid shipping address');
+    }
 
     const dimensions = await calculatePackageDimensions(items);
     const orderItems = await transformOrderItems(items);
@@ -206,6 +214,8 @@ export async function createShipRocketOrder(orderId: string) {
       weight: dimensions.weight,
     };
 
+    console.log('📦 ShipRocket payload prepared');
+
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'create_order',
@@ -215,19 +225,30 @@ export async function createShipRocketOrder(orderId: string) {
 
     const shipRocketResponse = await shipRocketClient.createOrder(payload);
 
+    console.log('✅ ShipRocket API response received:', shipRocketResponse);
+
+    // ✅ FIX: Add null checks before toString()
+    if (!shipRocketResponse || typeof shipRocketResponse.order_id === 'undefined') {
+      throw new Error('ShipRocket API returned invalid response - missing order_id');
+    }
+
+    if (typeof shipRocketResponse.shipment_id === 'undefined') {
+      throw new Error('ShipRocket API returned invalid response - missing shipment_id');
+    }
+
     const { error: updateError } = await supabase
       .from('orders')
       .update({
         shiprocket_order_id: shipRocketResponse.order_id.toString(),
         shiprocket_shipment_id: shipRocketResponse.shipment_id.toString(),
-        shiprocket_status: shipRocketResponse.status,
+        shiprocket_status: shipRocketResponse.status || 'created',
         shiprocket_synced_at: new Date().toISOString(),
         order_status: 'confirmed',
       })
       .eq('id', orderId);
 
     if (updateError) {
-      console.error('Failed to update order with ShipRocket details:', updateError);
+      console.error('❌ Failed to update order with ShipRocket details:', updateError);
     }
 
     await supabase.from('shiprocket_logs').insert({
@@ -238,11 +259,17 @@ export async function createShipRocketOrder(orderId: string) {
       status: 'success',
     });
 
+    // ✅ FIX: Only generate AWB if shipment_id exists
     if (shipRocketResponse.shipment_id) {
-      await generateAWBForOrder(orderId, shipRocketResponse.shipment_id);
+      console.log('🎫 Attempting to generate AWB...');
+      try {
+        await generateAWBForOrder(orderId, shipRocketResponse.shipment_id);
+      } catch (awbError) {
+        console.warn('⚠️ AWB generation failed (non-critical):', awbError);
+      }
     }
 
-    console.log(`ShipRocket order created successfully: ${shipRocketResponse.order_id}`);
+    console.log(`✅ ShipRocket order created successfully: ${shipRocketResponse.order_id}`);
 
     return {
       success: true,
@@ -250,14 +277,22 @@ export async function createShipRocketOrder(orderId: string) {
       shiprocket_shipment_id: shipRocketResponse.shipment_id,
     };
   } catch (error) {
-    console.error('Error creating ShipRocket order:', error);
+    console.error('❌ Error creating ShipRocket order:', error);
 
     const supabase = getSupabaseClient();
+    
+    // ✅ FIX: Better error message extraction
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === 'string' 
+      ? error 
+      : 'Unknown error creating ShipRocket order';
+
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'create_order',
       status: 'error',
-      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_message: errorMessage,
     });
 
     throw error;
@@ -271,26 +306,28 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
   const supabase = getSupabaseClient();
 
   try {
-    console.log(`Generating AWB for shipment: ${shipmentId}`);
+    console.log(`🎫 Generating AWB for shipment: ${shipmentId}`);
 
     const awbResponse = await shipRocketClient.generateAWB({
       shipment_id: shipmentId,
     });
+
+    console.log('✅ AWB API response:', awbResponse);
 
     const awbCode = awbResponse.response?.data?.awb_code || awbResponse.awb_code;
     const courierName = awbResponse.response?.data?.courier_name || awbResponse.courier_name;
     const courierId = awbResponse.response?.data?.courier_company_id || awbResponse.courier_company_id;
 
     if (!awbCode) {
-      throw new Error('AWB code not generated');
+      throw new Error('AWB code not generated by ShipRocket');
     }
 
     await supabase
       .from('orders')
       .update({
         awb_number: awbCode,
-        courier_name: courierName,
-        courier_id: courierId?.toString(),
+        courier_name: courierName || 'Unknown',
+        courier_id: courierId?.toString() || null,
         order_status: 'processing',
       })
       .eq('id', orderId);
@@ -302,18 +339,23 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       status: 'success',
     });
 
-    console.log(`AWB generated: ${awbCode}`);
+    console.log(`✅ AWB generated: ${awbCode}`);
 
     return { awb_code: awbCode, courier_name: courierName };
   } catch (error) {
-    console.error('Error generating AWB:', error);
+    console.error('❌ Error generating AWB:', error);
 
     const supabase = getSupabaseClient();
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Unknown error generating AWB';
+
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'generate_awb',
       status: 'error',
-      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_message: errorMessage,
     });
 
     return null;
@@ -358,14 +400,19 @@ export async function schedulePickupForOrder(orderId: string) {
 
     return pickupResponse;
   } catch (error) {
-    console.error('Error scheduling pickup:', error);
+    console.error('❌ Error scheduling pickup:', error);
 
     const supabase = getSupabaseClient();
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Unknown error scheduling pickup';
+
     await supabase.from('shiprocket_logs').insert({
       order_id: orderId,
       action: 'schedule_pickup',
       status: 'error',
-      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_message: errorMessage,
     });
 
     throw error;
