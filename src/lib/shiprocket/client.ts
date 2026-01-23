@@ -186,14 +186,33 @@ class ShipRocketClient {
   }
 
   /**
-   * Generate AWB (Air Waybill) for shipment
+   * Generate AWB (Air Waybill) for shipment - with auto courier recommendation
    */
   async generateAWB(
     payload: ShipRocketGenerateAWBPayload
   ): Promise<ShipRocketGenerateAWBResponse> {
     try {
       console.log('🎫 Generating AWB...');
+      console.log('🎫 Payload:', JSON.stringify(payload, null, 2));
       
+      // If no courier_id provided, use ShipRocket's recommendation endpoint
+      if (!payload.courier_id) {
+        console.log('ℹ️ No courier specified, using ShipRocket recommendation...');
+        
+        // Use the recommend endpoint instead
+        const response = await this.request<ShipRocketGenerateAWBResponse>(
+          '/courier/assign/recommend',
+          {
+            method: 'POST',
+            body: JSON.stringify({ shipment_id: payload.shipment_id }),
+          }
+        );
+        
+        console.log('✅ AWB generated via recommendation:', response);
+        return response;
+      }
+
+      // If courier_id is provided, use normal assignment
       const response = await this.request<ShipRocketGenerateAWBResponse>(
         '/courier/assign/awb',
         {
