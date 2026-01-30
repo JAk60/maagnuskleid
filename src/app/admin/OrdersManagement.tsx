@@ -43,7 +43,6 @@ interface OrdersApiResponse {
   error?: string;
 }
 
-
 export default function OrdersManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,9 +51,12 @@ export default function OrdersManagement() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+  const TAX_RATE = 0.05;
+
   useEffect(() => {
     fetchOrders();
   }, []);
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -269,7 +271,7 @@ export default function OrdersManagement() {
               <h2 className="text-2xl font-bold text-gray-900">Order Details</h2>
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 text-3xl leading-none"
               >
                 ×
               </button>
@@ -342,11 +344,11 @@ export default function OrdersManagement() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-semibold">₹{(selectedOrder.total - (selectedOrder.total * 0.18)).toFixed(0)}</span>
+                    <span className="font-semibold">₹{Math.round(selectedOrder.total / (1 + TAX_RATE)).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax (18%)</span>
-                    <span className="font-semibold">₹{(selectedOrder.total * 0.18).toFixed(0)}</span>
+                    <span className="text-gray-600">Tax (5%)</span>
+                    <span className="font-semibold">₹{Math.round(Math.round(selectedOrder.total / (1 + TAX_RATE)) * TAX_RATE).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total</span>

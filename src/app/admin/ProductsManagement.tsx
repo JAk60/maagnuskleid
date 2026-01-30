@@ -1,7 +1,6 @@
 import { Category } from "@/lib/categories-db";
 import { ChevronDown, ChevronUp, Edit, Image as ImageIcon, Package, Plus, Ruler, Save, Search, Trash2, Upload, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useEffect, useState, useRef } from "react";
 
 interface ColorOption {
   name: string;
@@ -13,6 +12,7 @@ interface ProductImage {
   image_url: string;
   display_order: number;
   is_primary: boolean;
+  preview?: string; // Local blob URL for instant preview
 }
 
 interface SizeChart {
@@ -56,29 +56,6 @@ interface DeleteApiResponse {
   error?: string;
 }
 
-interface CloudinaryUploadResult {
-  event: string;
-  info?: {
-    secure_url: string;
-  };
-}
-
-interface CloudinaryWidget {
-  open: () => void;
-  close: () => void;
-}
-
-declare global {
-  interface Window {
-    cloudinary?: {
-      createUploadWidget: (
-        config: Record<string, unknown>,
-        callback: (error: Error | null, result: CloudinaryUploadResult) => void
-      ) => CloudinaryWidget;
-    };
-  }
-}
-
 const SIZES = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
 const COLOR_PRESETS = [
@@ -112,13 +89,13 @@ export default function ProductsManagement() {
   const [colorNameInput, setColorNameInput] = useState("");
   const [colorHexInput, setColorHexInput] = useState("");
   const [showPresets, setShowPresets] = useState(false);
-  const [cloudinaryLoaded, setCloudinaryLoaded] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [sizeChart, setSizeChart] = useState<SizeChart[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Product>({
     name: "",
@@ -155,19 +132,6 @@ export default function ProductsManagement() {
   };
 
   const availableCategories = getCategoriesByGender(formData.gender);
-  
-  const loadCloudinaryScript = () => {
-    if (window.cloudinary) {
-      setCloudinaryLoaded(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://upload-widget.cloudinary.com/global/all.js";
-    script.async = true;
-    script.onload = () => setCloudinaryLoaded(true);
-    script.onerror = () => alert("Failed to load Cloudinary. Please refresh the page.");
-    document.body.appendChild(script);
-  };
 
   const fetchProducts = async () => {
     try {
@@ -251,10 +215,16 @@ export default function ProductsManagement() {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-    loadCloudinaryScript();
   }, []);
 
   const handleCloseModal = () => {
+    // Clean up blob URLs to prevent memory leaks
+    productImages.forEach(img => {
+      if (img.preview && img.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(img.preview);
+      }
+    });
+    
     setShowModal(false);
     setEditingProduct(null);
     setProductImages([]);
@@ -262,66 +232,116 @@ export default function ProductsManagement() {
     setShowSizeChart(false);
   };
 
-  const handleCloudinaryUpload = (imageIndex?: number) => {
-    if (!cloudinaryLoaded || !window.cloudinary) {
-      alert("Cloudinary is still loading. Please try again in a moment.");
+  // R2 Upload Handler
+  const handleR2Upload = async (imageIndex?: number) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.dataset.imageIndex = imageIndex !== undefined ? imageIndex.toString() : "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const imageIndex = event.target.dataset.imageIndex 
+      ? parseInt(event.target.dataset.imageIndex) 
+      : undefined;
+
+    // Validate file
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      alert("Please upload a valid image (JPG, PNG, or WebP)");
       return;
     }
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset) {
-      alert("Cloudinary is not configured.");
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size must be less than 5MB");
       return;
     }
+
+    // Create instant local preview
+    const localPreview = URL.createObjectURL(file);
+
     setUploading(true);
-    
-    const widget = window.cloudinary.createUploadWidget(
-      {
-        cloudName,
-        uploadPreset,
-        sources: ["local", "url", "camera"],
-        folder: "products",
-        multiple: false,
-        maxFiles: 1,
-        maxFileSize: 2000000,
-        clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
-        resourceType: "image",
-        cropping: true,
-        croppingAspectRatio: 1,
-      },
-      (error: Error | null, result: CloudinaryUploadResult) => {
-        if (error) {
-          console.error("Cloudinary upload error:", error);
-          alert("Upload failed");
-          setUploading(false);
-          return;
-        }
-        if (result?.event === "success" && result.info) {
-          const imageUrl = result.info.secure_url;
-          if (imageIndex !== undefined) {
-            const newImages = [...productImages];
-            newImages[imageIndex] = { ...newImages[imageIndex], image_url: imageUrl };
-            setProductImages(newImages);
-          } else {
-            const newImage: ProductImage = {
-              image_url: imageUrl,
-              display_order: productImages.length,
-              is_primary: productImages.length === 0,
-            };
-            setProductImages([...productImages, newImage]);
-          }
-          if (productImages.length === 0 || imageIndex === 0) {
-            setFormData(prev => ({ ...prev, image_url: imageUrl }));
-          }
-          setUploading(false);
-          widget.close();
-        }
-        if (result?.event === "close" || result?.event === "abort") {
-          setUploading(false);
-        }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/r2/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json() as { success: boolean; url?: string; error?: string; filename?: string };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Upload failed");
       }
-    );
-    widget.open();
+
+      const imageUrl = data.url;
+
+      if (!imageUrl) {
+        throw new Error("No URL returned from upload");
+      }
+
+      // Update images with BOTH the CDN URL and local preview
+      if (imageIndex !== undefined) {
+        const newImages = [...productImages];
+        // Clean up old preview if exists
+        if (newImages[imageIndex].preview?.startsWith('blob:')) {
+          URL.revokeObjectURL(newImages[imageIndex].preview!);
+        }
+        newImages[imageIndex] = { 
+          ...newImages[imageIndex], 
+          image_url: imageUrl,
+          preview: localPreview // Use local blob for preview
+        };
+        setProductImages(newImages);
+      } else {
+        const newImage: ProductImage = {
+          image_url: imageUrl,
+          display_order: productImages.length,
+          is_primary: productImages.length === 0,
+          preview: localPreview // Use local blob for preview
+        };
+        setProductImages([...productImages, newImage]);
+      }
+
+      if (productImages.length === 0 || imageIndex === 0) {
+        setFormData(prev => ({ ...prev, image_url: imageUrl }));
+      }
+
+      // Success toast
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-4 rounded-lg shadow-2xl z-[9999] animate-slide-up';
+      toast.innerHTML = `
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          <div>
+            <div class="font-bold">Upload Complete!</div>
+            <div class="text-sm opacity-90">${data.filename}</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert(error instanceof Error ? error.message : "Upload failed");
+      // Clean up the preview on error
+      URL.revokeObjectURL(localPreview);
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
   };
 
   const moveImage = (index: number, direction: "up" | "down") => {
@@ -337,7 +357,25 @@ export default function ProductsManagement() {
     }
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = async (index: number) => {
+    const imageToRemove = productImages[index];
+    
+    // Clean up blob preview
+    if (imageToRemove.preview?.startsWith('blob:')) {
+      URL.revokeObjectURL(imageToRemove.preview);
+    }
+    
+    // Delete from R2 if it's an R2 image
+    if (imageToRemove.image_url.includes("cdn.magnuskleid.com")) {
+      try {
+        await fetch(`/api/r2/delete?url=${encodeURIComponent(imageToRemove.image_url)}`, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        console.error("Failed to delete image from R2:", error);
+      }
+    }
+
     const newImages = productImages.filter((_, i) => i !== index);
     newImages.forEach((img, i) => {
       img.display_order = i;
@@ -491,9 +529,12 @@ export default function ProductsManagement() {
     }
     try {
       setSubmitting(true);
+      // Remove preview URLs before sending to API
+      const cleanImages = productImages.map(({ preview, ...img }) => img);
+      
       const payload = {
         ...formData,
-        images: productImages,
+        images: cleanImages,
         has_size_chart: showSizeChart,
         size_chart: showSizeChart ? sizeChart : [],
       };
@@ -568,6 +609,16 @@ export default function ProductsManagement() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Hidden file input for R2 uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        onChange={handleFileSelect}
+        className="hidden"
+        data-image-index=""
+      />
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products Management</h1>
@@ -620,12 +671,14 @@ export default function ProductsManagement() {
         ) : (
           currentItems.map((product) => (
             <div key={product.id} className="bg-white rounded-lg border p-4 flex gap-4 hover:shadow-md transition">
-              <Image
+              <img
                 src={product.image_url}
                 alt={product.name}
-                width={96}
-                height={96}
-                className="w-24 h-24 rounded object-cover"
+                className="w-24 h-24 rounded object-cover bg-gray-100"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="96" height="96"%3E%3Crect fill="%23f3f4f6" width="96" height="96"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="10" x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+                }}
               />
               <div className="flex-1">
                 <div className="flex items-start justify-between">
@@ -872,22 +925,49 @@ export default function ProductsManagement() {
               </div>
 
               <div>
-                <label className="block font-medium mb-3">Product Images * (Multiple)</label>
+                <label className="block font-medium mb-3">Product Images * (Multiple - Stored in R2)</label>
+                <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded mb-4">
+                  💡 Images show instant local preview. CDN URL is saved for production use.
+                </p>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   {productImages.map((img, index) => (
-                    <div key={index} className="relative border-2 border-gray-300 rounded-lg overflow-hidden group">
-                      <Image
-                        src={img.image_url}
-                        alt={`Product ${index + 1}`}
-                        width={300}
-                        height={300}
-                        className="w-full h-48 object-cover"
-                      />
+                    <div key={index} className="relative border-2 border-gray-300 rounded-lg overflow-hidden group bg-gray-50">
+                      {/* Use blob preview if available, otherwise use CDN URL */}
+                      {(img.preview || img.image_url) ? (
+                        <img
+                          src={img.preview || img.image_url}
+                          alt={`Product ${index + 1}`}
+                          className="w-full h-48 object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            // If preview fails, try CDN URL
+                            if (img.preview && target.src === img.preview) {
+                              target.src = img.image_url;
+                            } else {
+                              target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext fill="%239ca3af" font-size="12" x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"%3EImage Error%3C/text%3E%3C/svg%3E';
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-48 flex items-center justify-center bg-gray-100">
+                          <div className="text-center">
+                            <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                            <p className="text-xs text-gray-500">No Image</p>
+                          </div>
+                        </div>
+                      )}
 
                       {img.is_primary && (
-                        <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">
+                        <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold shadow-lg">
                           Primary
+                        </div>
+                      )}
+                      
+                      {img.preview && (
+                        <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded font-semibold shadow-lg">
+                          ✓ Uploaded
                         </div>
                       )}
 
@@ -895,26 +975,40 @@ export default function ProductsManagement() {
                         <button
                           onClick={() => moveImage(index, "up")}
                           disabled={index === 0}
-                          className="p-2 bg-white rounded disabled:opacity-50"
+                          className="p-2 bg-white rounded disabled:opacity-50 hover:bg-gray-100"
+                          title="Move up"
                         >
                           <ChevronUp size={16} />
                         </button>
                         <button
                           onClick={() => moveImage(index, "down")}
                           disabled={index === productImages.length - 1}
-                          className="p-2 bg-white rounded disabled:opacity-50"
+                          className="p-2 bg-white rounded disabled:opacity-50 hover:bg-gray-100"
+                          title="Move down"
                         >
                           <ChevronDown size={16} />
                         </button>
                         {!img.is_primary && (
-                          <button onClick={() => setPrimaryImage(index)} className="p-2 bg-blue-600 text-white rounded text-xs">
-                            Set Primary
+                          <button 
+                            onClick={() => setPrimaryImage(index)} 
+                            className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                            title="Set as primary"
+                          >
+                            Primary
                           </button>
                         )}
-                        <button onClick={() => handleCloudinaryUpload(index)} className="p-2 bg-green-600 text-white rounded">
+                        <button 
+                          onClick={() => handleR2Upload(index)} 
+                          className="p-2 bg-green-600 text-white rounded hover:bg-green-700"
+                          title="Replace image"
+                        >
                           <Upload size={16} />
                         </button>
-                        <button onClick={() => removeImage(index)} className="p-2 bg-red-600 text-white rounded">
+                        <button 
+                          onClick={() => removeImage(index)} 
+                          className="p-2 bg-red-600 text-white rounded hover:bg-red-700"
+                          title="Delete image"
+                        >
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -924,14 +1018,24 @@ export default function ProductsManagement() {
 
                 <button
                   type="button"
-                  onClick={() => handleCloudinaryUpload()}
+                  onClick={() => handleR2Upload()}
                   disabled={uploading}
-                  className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition disabled:opacity-50"
+                  className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Upload size={32} className="mx-auto mb-2 text-blue-600" />
-                  <p className="font-medium text-gray-700">
-                    {uploading ? "Uploading..." : `Add ${productImages.length > 0 ? 'Another' : ''} Image`}
-                  </p>
+                  {uploading ? (
+                    <>
+                      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <p className="font-medium text-gray-700">Uploading to R2...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={32} className="mx-auto mb-2 text-blue-600" />
+                      <p className="font-medium text-gray-700">
+                        {`Add ${productImages.length > 0 ? 'Another' : ''} Image`}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">JPG, PNG, WebP (max 5MB)</p>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -1156,7 +1260,7 @@ export default function ProductsManagement() {
               </div>
             </div>
 
-            <div className="sticky bottom-0 bg-white border-t p-6 flex justify-end gap-3">
+            <div className="sticky bottom-0 bg-white border-t p-6 flex justify-end gap-3 shadow-lg">
               <button
                 type="button"
                 onClick={handleCloseModal}

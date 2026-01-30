@@ -113,7 +113,7 @@ export default function OrdersPage() {
                   <div className="space-y-4 mb-6">
                     {order.items.map((item, index) => (
                       <div key={index} className="flex gap-4">
-                        <Image
+                        <img
                           src={item.product_image || "/placeholder.svg"}
                           alt={item.product_name}
                           className="w-20 h-20 object-cover rounded-lg"

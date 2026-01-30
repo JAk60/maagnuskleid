@@ -188,8 +188,8 @@ const Header = () => {
         )}
 
         {/* Right Side Icons */}
-        <div className="flex items-center gap-3 md:gap-4 text-black">
-          {/* Cart Icon */}
+        <div className="flex items-center gap-2 md:gap-4 text-black">
+          {/* Cart Icon - Always visible */}
           <Link href="/cart">
             <div className="w-10 md:w-12 h-10 md:h-12 flex justify-center items-center cursor-pointer relative">
               <BsCart className="text-[22px] md:text-[24px]" />
@@ -201,8 +201,8 @@ const Header = () => {
             </div>
           </Link>
 
-          {/* User Icon with Dropdown */}
-          <div className="relative user-menu-container">
+          {/* User Icon with Dropdown - Hidden on mobile, visible on md+ */}
+          <div className="relative user-menu-container hidden md:block">
             {isLoggedIn ? (
               <>
                 <div

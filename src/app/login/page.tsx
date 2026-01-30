@@ -166,14 +166,6 @@ export default function LoginPage() {
               </button>
             </p>
           </div>
-
-          <div className="pt-4 border-t border-border">
-            <p className="text-xs text-center text-muted-foreground">
-              💡 Tip: Use your{" "}
-              <span className="font-semibold">@maagnuskleid.com</span> email to
-              access admin panel
-            </p>
-          </div>
         </div>
       </div>
     </main>

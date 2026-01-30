@@ -17,20 +17,20 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <a
+                <Link
                   href="/contact"
                   className="hover:text-yellow-400 transition-colors"
                 >
                   Contact Us
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  href="/orders"
                   className="hover:text-yellow-400 transition-colors"
                 >
                   Track Order
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -42,28 +42,28 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <a
-                  href="/about"
+                <Link
+                  href="/Linkbout"
                   className="hover:text-yellow-400 transition-colors"
                 >
                   About Us
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/terms"
                   className="hover:text-yellow-400 transition-colors"
                 >
                   Terms & Conditions
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/privacy"
                   className="hover:text-yellow-400 transition-colors"
                 >
                   Privacy Policy
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -74,7 +74,7 @@ const Footer = () => {
               CONNECT WITH US
             </h3>
 
-            <a
+            <Link
               href="https://www.instagram.com/maagnuskleid?igsh=ZTJzemQ2dnpxeXFz"
               target="_blank"
               rel="noopener noreferrer"
@@ -82,7 +82,7 @@ const Footer = () => {
             >
               <Instagram className="w-6 h-6" />
               <span className="text-sm">Follow us on Instagram</span>
-            </a>
+            </Link>
           </div>
 
           {/* Payment Methods */}
