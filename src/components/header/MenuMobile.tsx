@@ -3,6 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import { BsChevronDown } from "react-icons/bs";
+import { IoPersonOutline } from "react-icons/io5";
+import { useAuth } from "@/context/auth-context";
 
 interface MenuMobileProps {
   showMenCat: boolean;
@@ -23,6 +25,8 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
   subMenuMenData,
   subMenuWomenData,
 }) => {
+  const { user, isLoggedIn, logout } = useAuth();
+
   const data = [
     { id: 1, name: "Home", url: "/" },
     // { id: 2, name: "All Products", url: "/products" },
@@ -30,8 +34,33 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
     { id: 4, name: "Women", subMenu: true },
   ];
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setMobileMenu(false);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   return (
-    <ul className="flex flex-col md:hidden font-bold absolute top-[50px] left-0 w-full h-[calc(100vh-50px)] bg-[#E3D9C6] border-t text-black">
+    <ul className="flex flex-col md:hidden font-bold absolute top-[50px] left-0 w-full h-[calc(100vh-50px)] bg-[#E3D9C6] border-t text-black overflow-y-auto">
+      {/* User Section - Only show if logged in */}
+      {isLoggedIn && user && (
+        <li className="border-b bg-[#D4C5B0]">
+          <div className="px-5 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#E3D9C6] flex items-center justify-center">
+              <IoPersonOutline className="text-[22px]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">{user.name}</p>
+              <p className="text-xs text-gray-600 truncate">{user.email}</p>
+            </div>
+          </div>
+        </li>
+      )}
+
+      {/* Main Menu Items */}
       {data.map((item) => {
         return (
           <React.Fragment key={item.id}>
@@ -100,6 +129,42 @@ const MenuMobile: React.FC<MenuMobileProps> = ({
           </React.Fragment>
         );
       })}
+
+      {/* User Account Links - Show if logged in */}
+      {isLoggedIn ? (
+        <>
+          <li className="py-4 px-5 border-b">
+            <Link href="/profile" onClick={() => setMobileMenu(false)}>
+              My Profile
+            </Link>
+          </li>
+
+          <li className="py-4 px-5 border-b">
+            <Link href="/orders" onClick={() => setMobileMenu(false)}>
+              My Orders
+            </Link>
+          </li>
+
+          <li className="py-4 px-5 border-b">
+            <button
+              onClick={handleLogout}
+              className="w-full text-left text-red-600"
+            >
+              Logout
+            </button>
+          </li>
+        </>
+      ) : (
+        // Login Link - Show if not logged in
+        <li className="py-4 px-5 border-b">
+          <Link href="/login" onClick={() => setMobileMenu(false)}>
+            <div className="flex items-center gap-2">
+              <IoPersonOutline className="text-[20px]" />
+              <span>Login / Sign Up</span>
+            </div>
+          </Link>
+        </li>
+      )}
     </ul>
   );
 };
