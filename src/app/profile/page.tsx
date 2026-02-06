@@ -8,6 +8,7 @@ import { useAuth } from "@/context/auth-context"
 import { getOrders, getAddresses, createAddress, updateAddress, deleteAddress, type Order, type Address } from "@/lib/supabase-orders"
 import Link from "next/link"
 import { User, MapPin, Package, Plus, Edit, Trash2, Check } from "lucide-react"
+import toast from "react-hot-toast"
 
 export default function ProfilePage() {
   const { isLoggedIn, user } = useAuth()
@@ -99,7 +100,7 @@ export default function ProfilePage() {
       })
     } catch (error) {
       console.error("Failed to save address:", error)
-      alert("Failed to save address")
+      toast.error("Failed to save address")
     }
   }
 
@@ -129,7 +130,7 @@ export default function ProfilePage() {
       setAddresses(addressesData)
     } catch (error) {
       console.error("Failed to delete address:", error)
-      alert("Failed to delete address")
+      toast.error("Failed to delete address")
     }
   }
 

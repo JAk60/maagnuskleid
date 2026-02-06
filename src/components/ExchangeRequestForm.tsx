@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { ArrowLeftRight, AlertCircle, CheckCircle, Package, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface OrderItem {
   id?: string;
@@ -103,43 +104,43 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
   const handleSubmit = async () => {
     // ✅ ADDED: Guard clause for missing IDs
     if (!order.id || !order.user_id) {
-      alert('Invalid order data');
+      toast.error('Invalid order data');
       return;
     }
 
     if (!selectedItem) {
-      alert('Please select an item to exchange');
+      toast.error('Please select an item to exchange');
       return;
     }
 
     if (!exchangeType) {
-      alert('Please select exchange type (size or color)');
+      toast.error('Please select exchange type (size or color)');
       return;
     }
 
     if (exchangeType === 'size' && !newSize) {
-      alert('Please select a new size');
+      toast.error('Please select a new size');
       return;
     }
 
     if (exchangeType === 'color' && !newColor) {
-      alert('Please select a new color');
+      toast.error('Please select a new color');
       return;
     }
 
     if (!reason) {
-      alert('Please select a reason');
+      toast.error('Please select a reason');
       return;
     }
 
     // Validate that something is actually changing
     if (exchangeType === 'size' && newSize === selectedItem.size) {
-      alert('Please select a different size');
+      toast.error('Please select a different size');
       return;
     }
 
     if (exchangeType === 'color' && newColor === selectedItem.color) {
-      alert('Please select a different color');
+      toast.error('Please select a different color');
       return;
     }
 
@@ -184,15 +185,15 @@ export default function ExchangeRequestForm({ order, onClose, onSuccess }: Excha
       const result = await response.json() as ExchangeResponse;
 
       if (result.success) {
-        alert('Exchange request submitted successfully! Our team will review it shortly.');
+        toast.success('Exchange request submitted successfully! Our team will review it shortly.');
         onSuccess?.();
         onClose();
       } else {
-        alert(result.error || 'Failed to submit exchange request');
+        toast.error(result.error || 'Failed to submit exchange request');
       }
     } catch (error) {
       console.error('Exchange submission error:', error);
-      alert('Failed to submit exchange request. Please try again.');
+      toast.error('Failed to submit exchange request. Please try again.');
     } finally {
       setLoading(false);
     }

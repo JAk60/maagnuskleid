@@ -1,6 +1,7 @@
 import { Category } from "@/lib/categories-db";
 import { ChevronDown, ChevronUp, Edit, Image as ImageIcon, Package, Plus, Ruler, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
+import toast from "react-hot-toast";
 
 interface ColorOption {
   name: string;
@@ -251,12 +252,12 @@ export default function ProductsManagement() {
     // Validate file
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      alert("Please upload a valid image (JPG, PNG, or WebP)");
+      toast.error("Please upload a valid image (JPG, PNG, or WebP)");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB");
+      toast.error("File size must be less than 5MB");
       return;
     }
 
@@ -332,7 +333,7 @@ export default function ProductsManagement() {
 
     } catch (error) {
       console.error("Upload error:", error);
-      alert(error instanceof Error ? error.message : "Upload failed");
+      toast.error(error instanceof Error ? error.message : "Upload failed");
       // Clean up the preview on error
       URL.revokeObjectURL(localPreview);
     } finally {
@@ -416,7 +417,7 @@ export default function ProductsManagement() {
 
   const addPresetColor = (preset: ColorOption) => {
     if (formData.colors.some(c => c.hex === preset.hex)) {
-      alert("This color is already added");
+      toast.error("This color is already added");
       return;
     }
     setFormData(prev => ({
@@ -427,21 +428,21 @@ export default function ProductsManagement() {
 
   const handleAddCustomColor = () => {
     if (!colorNameInput.trim() || !colorHexInput.trim()) {
-      alert("Please enter both color name and hex code");
+      toast.error("Please enter both color name and hex code");
       return;
     }
     let hex = colorHexInput.trim();
     if (!hex.startsWith("#")) hex = "#" + hex;
     const regex = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/;
     if (!regex.test(hex)) {
-      alert("Invalid hex color");
+      toast.error("Invalid hex color");
       return;
     }
     if (hex.length === 4) {
       hex = "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
     }
     if (formData.colors.some(c => c.hex === hex.toUpperCase())) {
-      alert("This color is already added");
+      toast.error("This color is already added");
       return;
     }
     setFormData(prev => ({
@@ -475,43 +476,43 @@ export default function ProductsManagement() {
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      alert("Product name is required");
+      toast.error("Product name is required");
       return;
     }
     if (formData.price <= 0) {
-      alert("Price must be greater than 0");
+      toast.error("Price must be greater than 0");
       return;
     }
     if (!formData.category) {
-      alert("Please select a category");
+      toast.error("Please select a category");
       return;
     }
     if (!formData.sizes.length) {
-      alert("Select at least one size");
+      toast.error("Select at least one size");
       return;
     }
     if (!formData.colors.length) {
-      alert("Add at least one color");
+      toast.error("Add at least one color");
       return;
     }
     if (productImages.length === 0) {
-      alert("Please upload at least one product image");
+      toast.error("Please upload at least one product image");
       return;
     }
     if (!formData.weight || formData.weight < 0.1) {
-      alert("Weight must be at least 0.1 kg");
+      toast.error("Weight must be at least 0.1 kg");
       return;
     }
     if (!formData.length || formData.length < 1) {
-      alert("Length must be at least 1 cm");
+      toast.error("Length must be at least 1 cm");
       return;
     }
     if (!formData.breadth || formData.breadth < 1) {
-      alert("Breadth must be at least 1 cm");
+      toast.error("Breadth must be at least 1 cm");
       return;
     }
     if (!formData.height || formData.height < 1) {
-      alert("Height must be at least 1 cm");
+      toast.error("Height must be at least 1 cm");
       return;
     }
     if (showSizeChart && sizeChart.length > 0) {
@@ -523,7 +524,7 @@ export default function ProductsManagement() {
         }
       });
       if (!isValid) {
-        alert(`Please fill all size chart measurements for ${formData.gender === "Male" ? "Chest and Length" : "Bust and Length"}`);
+        toast.error(`Please fill all size chart measurements for ${formData.gender === "Male" ? "Chest and Length" : "Bust and Length"}`);
         return;
       }
     }
@@ -546,14 +547,14 @@ export default function ProductsManagement() {
       });
       const data = await res.json() as ProductsApiResponse;
       if (!res.ok || !data.success) throw new Error(data.error);
-      alert(editingProduct ? "Product updated successfully!" : "Product created successfully!");
+      toast.success(editingProduct ? "Product updated successfully!" : "Product created successfully!");
       await fetchProducts();
       handleCloseModal();
     } catch (err) {
       if (err instanceof Error) {
-        alert("Error: " + err.message);
+        toast.error("Error: " + err.message);
       } else {
-        alert("An unknown error occurred");
+        toast.error("An unknown error occurred");
       }
     } finally {
       setSubmitting(false);
@@ -574,13 +575,13 @@ export default function ProductsManagement() {
         throw new Error(data.error || "Delete failed");
       }
 
-      alert("Product deleted successfully!");
+      toast.error("Product deleted successfully!");
       fetchProducts();
     } catch (error) {
       if (error instanceof Error) {
-        alert("Error: " + error.message);
+        toast.error("Error: " + error.message);
       } else {
-        alert("An unknown error occurred");
+        toast.error("An unknown error occurred");
       }
     }
   };

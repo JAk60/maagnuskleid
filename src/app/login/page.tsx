@@ -5,6 +5,7 @@ import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { adminLogin } from "@/lib/admin-auth"
+import toast from "react-hot-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -46,7 +47,7 @@ export default function LoginPage() {
 
       if (isSignup) {
         await signup(email, password, name)
-        alert("Account created! Please check your email to confirm.")
+        toast.success("Account created! Please check your email to confirm.")
       } else {
         await login(email, password)
       }
@@ -72,7 +73,7 @@ export default function LoginPage() {
               {isSignup ? "Create Account" : "Welcome Back"}
             </h1>
             <p className="text-muted-foreground">
-              {isSignup ? "Join genzquicks today" : "Sign in to your account"}
+              {isSignup ? "Join Maagnuskleid today" : "Sign in to your account"}
             </p>
           </div>
 
@@ -144,8 +145,8 @@ export default function LoginPage() {
               {isLoading
                 ? "Loading..."
                 : isSignup
-                ? "Create Account"
-                : "Sign In"}
+                  ? "Create Account"
+                  : "Sign In"}
             </button>
           </form>
 

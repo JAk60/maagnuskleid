@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useCart } from "@/context/cart-context"
 import Image from "next/image"
+import toast from "react-hot-toast"
 
 interface Product {
   id: number
@@ -24,7 +25,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   const handleAddToCart = () => {
     if (!selectedSize) {
-      alert("Please select a size")
+      toast.error("Please select a size")
       return
     }
 

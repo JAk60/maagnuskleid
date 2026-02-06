@@ -2,6 +2,7 @@
 
 import { Download, Eye, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface OrderItem {
   product_image: string;
@@ -90,12 +91,12 @@ export default function OrdersManagement() {
       });
 
       if (response.ok) {
-        alert('Order status updated successfully!');
+        toast.success('Order status updated successfully!');
         fetchOrders();
       }
     } catch (error) {
       console.error('Failed to update order:', error);
-      alert('Failed to update order status');
+      toast.error('Failed to update order status');
     }
   };
 

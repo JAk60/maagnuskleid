@@ -11,6 +11,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 interface ExchangeItem {
   product_image: string;
   product_name: string;
@@ -98,12 +99,12 @@ export default function ExchangeManagement() {
     
     // Validation
     if (actionType === 'reject' && !adminNotes) {
-      alert('Please provide a reason for rejection');
+      toast.error('Please provide a reason for rejection');
       return;
     }
     
     if (actionType === 'ship' && !trackingNumber) {
-      alert('Please provide a tracking number');
+      toast.error('Please provide a tracking number');
       return;
     }
 
@@ -140,15 +141,15 @@ export default function ExchangeManagement() {
       const data = await response.json()  as { success: boolean; error?: string };
 
       if (data.success) {
-        alert(`Exchange ${actionType}d successfully!`);
+        toast.success(`Exchange ${actionType}d successfully!`);
         setShowActionModal(false);
         fetchExchanges();
       } else {
-        alert(data.error || 'Failed to update exchange');
+        toast.error(data.error || 'Failed to update exchange');
       }
     } catch (error) {
       console.error('Action error:', error);
-      alert('Failed to update exchange');
+      toast.error('Failed to update exchange');
     } finally {
       setProcessing(false);
     }

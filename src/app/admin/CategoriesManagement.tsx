@@ -9,6 +9,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface Category {
   id: string;
@@ -67,7 +68,7 @@ export default function CategoryManagement() {
       setCategories(data.data || []);
     } catch (error) {
       console.error('Failed to load categories:', error);
-      alert(
+      toast.error(
         'Failed to load categories: ' +
           (error instanceof Error ? error.message : 'Unknown error')
       );
@@ -125,7 +126,7 @@ export default function CategoryManagement() {
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.slug) {
-      alert('Name and slug are required');
+      toast.error('Name and slug are required');
       return;
     }
 
@@ -147,12 +148,12 @@ export default function CategoryManagement() {
         throw new Error(data.error || 'Operation failed');
       }
 
-      alert(editingCategory ? 'Category updated!' : 'Category created!');
+      toast.success(editingCategory ? 'Category updated!' : 'Category created!');
       await fetchCategories();
       handleCloseModal();
     } catch (error) {
       console.error('Submit error:', error);
-      alert(error instanceof Error ? error.message : 'An error occurred');
+      toast.error(error instanceof Error ? error.message : 'An error occurred');
     }
   };
 
@@ -170,10 +171,10 @@ export default function CategoryManagement() {
         throw new Error(data.error || 'Delete failed');
       }
 
-      alert('Category deleted!');
+      toast.error('Category deleted!');
       fetchCategories();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'An error occurred');
+      toast.error(error instanceof Error ? error.message : 'An error occurred');
     }
   };
 
@@ -196,7 +197,7 @@ export default function CategoryManagement() {
 
       fetchCategories();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'An error occurred');
+      toast.error(error instanceof Error ? error.message : 'An error occurred');
     }
   };
 

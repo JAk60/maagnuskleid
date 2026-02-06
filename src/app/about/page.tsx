@@ -129,7 +129,7 @@ export default function AboutPage() {
                     standout moments.
                   </p>
                   <p className="text-lg leading-relaxed text-[#E3D9C6]/70">
-                    We believe clothing is more than just style—it's an extension of identity.
+                    We believe clothing is more than just style—it an extension of identity.
                   </p>
                 </div>
               </div>
@@ -151,7 +151,7 @@ export default function AboutPage() {
                     <path d="M10 8v8h-4l4 8h8l-4-8h4v-8zM22 8v8h-4l4 8h8l-4-8h4v-8z" />
                   </svg>
                   <p className="text-xl md:text-2xl font-light leading-relaxed italic mb-6">
-                    Maagnus Kleid is for those who don't chase trends, but define their own presence,
+                    Maagnus Kleid is for those who do not chase trends, but define their own presence,
                     choosing to wear the difference and move with quiet confidence.
                   </p>
                 </div>
