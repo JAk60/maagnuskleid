@@ -11,6 +11,7 @@ export interface SizeChartEntry {
 	[key: string]: string | number | undefined;
 }
 
+
 export interface Product {
 	size_chart: SizeChartEntry[];
 	has_size_chart: boolean;

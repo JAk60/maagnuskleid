@@ -1,10 +1,25 @@
 'use client'
 
 import Script from "next/script"
+import { usePathname } from "next/navigation"
+import { useEffect } from "react"
+
+declare global {
+  interface Window {
+    fbq: (event: string, data: string) => void
+  }
+}
 
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
 
 export default function MetaPixel() {
+  const pathname = usePathname()
+
+  useEffect(() => {
+    if (!META_PIXEL_ID || typeof window.fbq !== 'function') return
+    window.fbq('track', 'PageView')
+  }, [pathname]) // re-fires on every route change
+
   if (!META_PIXEL_ID) return null
 
   return (
@@ -27,12 +42,8 @@ export default function MetaPixel() {
           `,
         }}
       />
-
       <noscript>
-        <img
-          height="1"
-          width="1"
-          style={{ display: "none" }}
+        <img height="1" width="1" style={{ display: "none" }}
           src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
           alt=""
         />

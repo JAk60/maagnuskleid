@@ -1,14 +1,10 @@
-'use client'
-
-import Footer from "@/components/Footer"
-import Header from "@/components/header"
+// src/app/layout.tsx  <-- no 'use client' here
+import ConditionalLayout from "./ConditionalLayout"
 import { AuthProvider } from "@/context/auth-context"
 import { CartProvider } from "@/context/cart-context"
-import localFont from "next/font/local"
-import { usePathname } from 'next/navigation'
-import type React from "react"
-import "./globals.css"
 import MetaPixel from "@/components/MetaPixel"
+import localFont from "next/font/local"
+import "./globals.css"
 
 const paragraph = localFont({
   src: [
@@ -21,24 +17,15 @@ const paragraph = localFont({
   variable: '--font-paragraph',
 })
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
 
-  const pathname = usePathname()
-  const isAdminRoute = pathname?.startsWith('/admin')
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={paragraph.variable}>
-      <body className="--font-paragraph">
+      <body>
         <MetaPixel />
         <AuthProvider>
           <CartProvider>
-            {!isAdminRoute && <Header />}
-            {children}
-            {!isAdminRoute && <Footer />}
+            <ConditionalLayout>{children}</ConditionalLayout>
           </CartProvider>
         </AuthProvider>
       </body>
