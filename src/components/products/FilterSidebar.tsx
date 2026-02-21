@@ -145,8 +145,8 @@ export default function FilterSidebar({
             className="w-full"
           />
           <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>${priceRange[0]}</span>
-            <span>${filters.priceRange[1]}</span>
+            <span>₹{priceRange[0]}</span>
+            <span>₹{filters.priceRange[1]}</span>
           </div>
         </div>
       </div>
@@ -159,7 +159,7 @@ export default function FilterSidebar({
             <button
               key={size}
               onClick={() => handleSizeChange(size)}
-              className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.sizes.includes(size)
+              className={`px-3 py-1.5 text-sm border rounded-md transition-colors ₹{filters.sizes.includes(size)
                 ? 'bg-gray-900 text-white border-gray-900'
                 : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
                 }`}
@@ -180,9 +180,9 @@ export default function FilterSidebar({
             
             return (
               <button
-                key={`color-${colorValue}-${idx}`}
+                key={`color-₹{colorValue}-₹{idx}`}
                 onClick={() => handleColorChange(color)}
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ${filters.colors.includes(colorValue)
+                className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ₹{filters.colors.includes(colorValue)
                   ? 'bg-gray-900 text-white border-gray-900'
                   : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
                   }`}

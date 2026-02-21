@@ -1,4 +1,5 @@
 'use client'
+
 import Footer from "@/components/Footer"
 import Header from "@/components/header"
 import { AuthProvider } from "@/context/auth-context"
@@ -7,7 +8,7 @@ import localFont from "next/font/local"
 import { usePathname } from 'next/navigation'
 import type React from "react"
 import "./globals.css"
-
+import MetaPixel from "@/components/MetaPixel"
 
 const paragraph = localFont({
   src: [
@@ -20,18 +21,19 @@ const paragraph = localFont({
   variable: '--font-paragraph',
 })
 
-
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
+
   const pathname = usePathname()
   const isAdminRoute = pathname?.startsWith('/admin')
 
   return (
     <html lang="en" className={paragraph.variable}>
-      <body className={`--font-paragraph`}>
+      <body className="--font-paragraph">
+        <MetaPixel />
         <AuthProvider>
           <CartProvider>
             {!isAdminRoute && <Header />}

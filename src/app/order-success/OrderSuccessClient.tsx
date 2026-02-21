@@ -162,7 +162,9 @@ export default function OrderSuccessClient() {
                   <Image
                     src={item.product_image || "/placeholder-product.jpg"}
                     alt={item.product_name}
-                    className="w-20 h-20 object-cover rounded-lg"
+                    width={80}
+                    height={80}
+                    className="object-cover rounded-lg"
                   />
                   <div className="flex-1">
                     <h4 className="font-semibold">{item.product_name}</h4>

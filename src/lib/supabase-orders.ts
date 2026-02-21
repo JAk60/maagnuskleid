@@ -1,4 +1,4 @@
-// lib/supabase-orders.ts - UPDATED WITH INVENTORY MANAGEMENT
+// lib/supabase-orders.ts - UPDATED WITH COD SUPPORT
 
 import { supabase } from './supabase'
 import { validateStock, updateProductStock, restoreProductStock } from './inventory'
@@ -47,11 +47,12 @@ export interface Order {
   subtotal: number
   tax: number
   shipping_cost: number
+  cod_charge: number   // ✅ NEW: ₹100 for COD, 0 for Razorpay
   total: number
 
   shipping_address: Address
 
-  payment_method: string
+  payment_method: 'razorpay' | 'cod'  // ✅ Strict union instead of plain string
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded'
 
   razorpay_order_id?: string
@@ -153,7 +154,7 @@ const orderCreationLimits = new Map<string, { count: number; resetTime: number }
 function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: string } {
   const now = Date.now();
   const userLimit = orderCreationLimits.get(userId);
-  
+
   const LIMIT = 3;
   const WINDOW = 10 * 60 * 1000;
 
@@ -177,7 +178,6 @@ function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: 
   return { allowed: true };
 }
 
-// ✅ UPDATED: Create order with automatic inventory update and better error handling
 export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) {
   // Check rate limit
   const rateLimitCheck = checkOrderCreationLimit(order.user_id);
@@ -224,23 +224,31 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
     throw new Error(`Stock validation failed: ${stockValidation.errors.join(', ')}`);
   }
 
-  // ✅ STEP 2: Generate order number and create order in database
+  // ✅ STEP 2: Determine initial order_status based on payment method
+  // COD orders are immediately confirmed since no payment gateway is involved
+  // Razorpay orders stay 'pending' until payment is verified
+  const initialOrderStatus = order.payment_method === 'cod' ? 'confirmed' : 'pending';
+
+  // ✅ STEP 3: Generate order number and create order in database
   console.log('📝 Creating order in database...');
-  
-  // Generate unique order number (format: ORD-TIMESTAMP-RANDOM)
+
   const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-  
+
   const orderWithNumber = {
     ...order,
-    order_number: orderNumber
+    order_number: orderNumber,
+    order_status: initialOrderStatus,
+    cod_charge: order.cod_charge ?? 0,
   };
-  
+
   console.log('Order data:', {
     order_number: orderNumber,
     user_id: order.user_id,
     items_count: order.items.length,
     total: order.total,
     payment_method: order.payment_method,
+    cod_charge: order.cod_charge,
+    initial_status: initialOrderStatus,
     has_shipping_address: !!order.shipping_address
   });
 
@@ -258,10 +266,9 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
       code: error.code,
       fullError: JSON.stringify(error, null, 2)
     });
-    
-    // Provide a more helpful error message
+
     let errorMessage = 'Failed to create order';
-    
+
     if (error.message) {
       errorMessage = error.message;
     } else if (error.details) {
@@ -271,7 +278,7 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
     } else {
       errorMessage = 'Failed to create order. Please check that all required fields are provided.';
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -279,7 +286,7 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
     throw new Error('Order created but no data returned from database');
   }
 
-  // ✅ STEP 3: Update product stock
+  // ✅ STEP 4: Update product stock
   console.log('📉 Updating product inventory...');
   try {
     const stockUpdate = await updateProductStock(
@@ -293,20 +300,18 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
 
     if (!stockUpdate.success) {
       console.error('❌ Stock update failed:', stockUpdate.errors);
-      
-      // Rollback: Delete the order if stock update failed
+
       console.log('🔄 Rolling back order creation...');
       await supabase.from('orders').delete().eq('id', data.id);
-      
+
       throw new Error(`Stock update failed: ${stockUpdate.errors.join(', ')}. Order has been cancelled.`);
     }
   } catch (stockError) {
     console.error('❌ Stock update exception:', stockError);
-    
-    // Rollback: Delete the order
+
     console.log('🔄 Rolling back order creation due to exception...');
     await supabase.from('orders').delete().eq('id', data.id);
-    
+
     throw new Error(`Failed to update inventory: ${stockError instanceof Error ? stockError.message : 'Unknown error'}. Order has been cancelled.`);
   }
 
@@ -380,12 +385,9 @@ export async function updateOrderStatus(orderId: string, status: Order['order_st
   return data as Order;
 }
 
-// ✅ UPDATED: Cancel order and restore stock
 export async function cancelOrder(orderId: string) {
-  // Get order details
   const order = await getOrderById(orderId);
-  
-  // Restore stock
+
   console.log('📈 Restoring product inventory...');
   const stockRestore = await restoreProductStock(
     order.items.map(item => ({
@@ -400,6 +402,5 @@ export async function cancelOrder(orderId: string) {
     console.error('⚠️ Stock restore had errors:', stockRestore.errors);
   }
 
-  // Update order status
   return updateOrderStatus(orderId, 'cancelled');
 }

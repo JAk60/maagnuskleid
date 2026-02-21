@@ -1,4 +1,4 @@
-// lib/shiprocket/orderService.ts - FIXED FOR BUILD
+// lib/shiprocket/orderService.ts - UPDATED WITH COD SUPPORT
 import { createClient } from '@supabase/supabase-js';
 import { shipRocketClient } from './client';
 import {
@@ -6,7 +6,10 @@ import {
   ShipRocketOrderItem,
 } from './types';
 
-// Type definitions for order data structures
+// =====================
+// Types
+// =====================
+
 interface OrderItem {
   product_id: string;
   product_name?: string;
@@ -34,6 +37,8 @@ interface Order {
   shipping_address: ShippingAddress;
   items: OrderItem[];
   payment_status: string;
+  payment_method: string;   // ✅ NEW: 'razorpay' | 'cod'
+  cod_charge: number;       // ✅ NEW: ₹100 for COD, 0 otherwise
   shipping_cost: string | number;
   subtotal: string | number;
   shiprocket_order_id?: string;
@@ -54,7 +59,7 @@ interface Product {
   name?: string;
 }
 
-// ✅ FIX: Lazy initialization
+// ✅ Lazy initialization
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -76,7 +81,7 @@ async function calculatePackageDimensions(items: OrderItem[]): Promise<{
   height: number;
 }> {
   const supabase = getSupabaseClient();
-  
+
   let totalWeight = 0;
   let maxLength = 0;
   let maxBreadth = 0;
@@ -140,6 +145,14 @@ async function transformOrderItems(items: OrderItem[]): Promise<ShipRocketOrderI
 }
 
 /**
+ * ✅ Resolve ShipRocket payment method explicitly from order.payment_method
+ * Never rely on payment_status — a Razorpay order can be 'pending' too
+ */
+function resolveShipRocketPaymentMethod(order: Order): string {
+  return order.payment_method === 'cod' ? 'COD' : 'Prepaid';
+}
+
+/**
  * Create ShipRocket order from Supabase order
  */
 export async function createShipRocketOrder(orderId: string) {
@@ -184,7 +197,6 @@ export async function createShipRocketOrder(orderId: string) {
     const { data: user } = await supabase.auth.admin.getUserById(order.user_id);
     const userEmail = user?.user?.email || 'customer@example.com';
 
-    // Helper function to capitalize state name properly
     const formatStateName = (state: string): string => {
       return state
         .toLowerCase()
@@ -193,12 +205,21 @@ export async function createShipRocketOrder(orderId: string) {
         .join(' ');
     };
 
+    // ✅ Resolve payment method explicitly — COD vs Prepaid
+    const shipRocketPaymentMethod = resolveShipRocketPaymentMethod(order);
+
+    // ✅ cod_charge goes to transaction_charges so ShipRocket knows the fee
+    // For Prepaid orders this will be 0
+    const codCharge = order.payment_method === 'cod' ? (order.cod_charge ?? 100) : 0;
+
+    console.log(`💳 Payment method: ${shipRocketPaymentMethod}, COD charge: ₹${codCharge}`);
+
     const payload: ShipRocketCreateOrderPayload = {
       order_id: order.order_number,
       order_date: new Date(order.created_at).toISOString().split('T')[0],
       pickup_location: process.env.SHIPROCKET_PICKUP_NAME || 'Primary',
       channel_id: '',
-      comment: `Order from StyleHub - ${order.order_number}`,
+      comment: `Order from Magnus Kleid - ${order.order_number}`,
       billing_customer_name: shippingAddress.first_name,
       billing_last_name: shippingAddress.last_name || '',
       billing_address: shippingAddress.address_line1,
@@ -211,10 +232,10 @@ export async function createShipRocketOrder(orderId: string) {
       billing_phone: shippingAddress.phone,
       shipping_is_billing: true,
       order_items: orderItems,
-      payment_method: order.payment_status === 'paid' ? 'Prepaid' : 'COD',
+      payment_method: shipRocketPaymentMethod,    // ✅ 'COD' or 'Prepaid'
       shipping_charges: Number(order.shipping_cost) || 0,
       giftwrap_charges: 0,
-      transaction_charges: 0,
+      transaction_charges: codCharge,             // ✅ ₹100 for COD, 0 for Prepaid
       total_discount: 0,
       sub_total: Number(order.subtotal) || 0,
       length: dimensions.length,
@@ -233,13 +254,13 @@ export async function createShipRocketOrder(orderId: string) {
     });
 
     let shipRocketResponse;
-    
+
     try {
       shipRocketResponse = await shipRocketClient.createOrder(payload);
       console.log('✅ ShipRocket API response received:', JSON.stringify(shipRocketResponse, null, 2));
     } catch (apiError: unknown) {
       const errorMsg = apiError instanceof Error ? apiError.message : JSON.stringify(apiError);
-      
+
       await supabase.from('shiprocket_logs').insert({
         order_id: orderId,
         action: 'create_order_api_error',
@@ -248,13 +269,11 @@ export async function createShipRocketOrder(orderId: string) {
         status: 'error',
         error_message: `ShipRocket API call failed: ${errorMsg}`,
       });
-      
+
       throw new Error(`ShipRocket API call failed: ${errorMsg}`);
     }
 
-    // ✅ FIX: Add null checks before toString()
     if (!shipRocketResponse || typeof shipRocketResponse.order_id === 'undefined') {
-      // Log the full response to database for debugging
       await supabase.from('shiprocket_logs').insert({
         order_id: orderId,
         action: 'create_order_failed',
@@ -263,7 +282,7 @@ export async function createShipRocketOrder(orderId: string) {
         status: 'error',
         error_message: `ShipRocket returned invalid response. Full response: ${JSON.stringify(shipRocketResponse)}`,
       });
-      
+
       throw new Error(`ShipRocket returned invalid response. Full response: ${JSON.stringify(shipRocketResponse)}`);
     }
 
@@ -276,7 +295,7 @@ export async function createShipRocketOrder(orderId: string) {
         status: 'error',
         error_message: `ShipRocket returned order_id but no shipment_id. Response: ${JSON.stringify(shipRocketResponse)}`,
       });
-      
+
       throw new Error(`ShipRocket returned order_id but no shipment_id. Response: ${JSON.stringify(shipRocketResponse)}`);
     }
 
@@ -287,7 +306,9 @@ export async function createShipRocketOrder(orderId: string) {
         shiprocket_shipment_id: shipRocketResponse.shipment_id.toString(),
         shiprocket_status: shipRocketResponse.status || 'created',
         shiprocket_synced_at: new Date().toISOString(),
-        order_status: 'confirmed',
+        // ✅ Don't override order_status for COD — it's already 'confirmed'
+        // Only set for Prepaid (was previously 'pending', now ShipRocket created)
+        ...(order.payment_method !== 'cod' && { order_status: 'confirmed' }),
       })
       .eq('id', orderId);
 
@@ -303,7 +324,6 @@ export async function createShipRocketOrder(orderId: string) {
       status: 'success',
     });
 
-    // ✅ FIX: Only generate AWB if shipment_id exists
     if (shipRocketResponse.shipment_id) {
       console.log('🎫 Attempting to generate AWB...');
       try {
@@ -315,11 +335,6 @@ export async function createShipRocketOrder(orderId: string) {
 
     console.log(`✅ ShipRocket order created successfully: ${shipRocketResponse.order_id}`);
 
-    // ✅ FIX: Don't auto-generate AWB immediately
-    // ShipRocket needs a few seconds to process the order before AWB can be generated
-    // Let admin manually click "Generate AWB" button, or we can add delay here
-    console.log('ℹ️ AWB generation skipped - admin can generate manually via button');
-
     return {
       success: true,
       shiprocket_order_id: shipRocketResponse.order_id,
@@ -329,12 +344,11 @@ export async function createShipRocketOrder(orderId: string) {
     console.error('❌ Error creating ShipRocket order:', error);
 
     const supabase = getSupabaseClient();
-    
-    // ✅ FIX: Better error message extraction
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : typeof error === 'string' 
-      ? error 
+
+    const errorMessage = error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
       : 'Unknown error creating ShipRocket order';
 
     await supabase.from('shiprocket_logs').insert({
@@ -357,7 +371,6 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
   try {
     console.log(`🎫 Generating AWB for shipment: ${shipmentId}`);
 
-    // First, get order details to check courier availability
     const { data: order } = await supabase
       .from('orders')
       .select('shipping_address, awb_number')
@@ -368,27 +381,24 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       throw new Error('Order not found');
     }
 
-    // Don't regenerate if AWB already exists
     if (order.awb_number) {
       console.log(`✅ AWB already exists: ${order.awb_number}`);
       return { awb_code: order.awb_number, courier_name: 'Existing' };
     }
 
-    // Check available couriers for this pincode
     console.log('📍 Checking courier availability...');
-    
+
     let courierId: number | undefined;
-    
+
     try {
       const couriers = await shipRocketClient.getAvailableCouriers(
         process.env.SHIPROCKET_PICKUP_PINCODE || '400084',
         order.shipping_address.postal_code,
-        0.5, // weight in kg
-        0 // prepaid (0) or COD (1)
+        0.5,
+        0
       );
 
       if (couriers.available_courier_companies && couriers.available_courier_companies.length > 0) {
-        // Select the cheapest courier
         const sortedCouriers = couriers.available_courier_companies.sort((a, b) => a.rate - b.rate);
         courierId = sortedCouriers[0].courier_company_id;
         console.log(`✅ Selected courier: ${sortedCouriers[0].courier_name} (ID: ${courierId})`);
@@ -399,8 +409,7 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       console.warn('⚠️ Courier check failed, will try auto-assignment:', courierError);
     }
 
-    // Generate AWB with or without courier_id (ShipRocket can auto-assign)
-    const awbPayload = courierId 
+    const awbPayload = courierId
       ? { shipment_id: shipmentId, courier_id: courierId }
       : { shipment_id: shipmentId };
 
@@ -440,9 +449,9 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
     console.error('❌ Error generating AWB:', error);
 
     const supabase = getSupabaseClient();
-    
-    const errorMessage = error instanceof Error 
-      ? error.message 
+
+    const errorMessage = error instanceof Error
+      ? error.message
       : 'Unknown error generating AWB';
 
     await supabase.from('shiprocket_logs').insert({
@@ -452,7 +461,6 @@ export async function generateAWBForOrder(orderId: string, shipmentId: number) {
       error_message: errorMessage,
     });
 
-    // Don't throw - let the order creation succeed even if AWB fails
     console.warn('⚠️ AWB generation failed, can be retried manually');
     return null;
   }
@@ -499,9 +507,9 @@ export async function schedulePickupForOrder(orderId: string) {
     console.error('❌ Error scheduling pickup:', error);
 
     const supabase = getSupabaseClient();
-    
-    const errorMessage = error instanceof Error 
-      ? error.message 
+
+    const errorMessage = error instanceof Error
+      ? error.message
       : 'Unknown error scheduling pickup';
 
     await supabase.from('shiprocket_logs').insert({
