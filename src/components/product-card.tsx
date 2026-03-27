@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useCart } from "@/context/cart-context"
 import Image from "next/image"
 import toast from "react-hot-toast"
+import { fbq } from "@/lib/meta-pixel"
 
 interface Product {
   id: number
@@ -34,8 +35,18 @@ export function ProductCard({ product }: { product: Product }) {
       name: product?.name,
       price: product?.price,
       size: selectedSize,
-      color:product.color,
+      color: product.color,
       image: product?.image,
+    })
+
+    // AddToCart
+    fbq('AddToCart', {
+      content_ids: [product.id],
+      content_name: product.name,
+      content_type: 'product',
+      value: product.price * quantity,
+      currency: 'INR',
+      num_items: quantity,
     })
 
     setShowAdded(true)
@@ -63,7 +74,7 @@ export function ProductCard({ product }: { product: Product }) {
           <Link href={`/products/${product?.id}`}>
             <h3 className="font-semibold text-lg hover:text-primary transition-colors">{product?.name}</h3>
           </Link>
-          <p className="text-2xl font-bold text-primary mt-2">${product?.price}</p>
+          <p className="text-2xl font-bold text-primary mt-2">₹{product?.price}</p>
         </div>
 
         {/* Size Selection */}

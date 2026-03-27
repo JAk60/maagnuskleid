@@ -10,7 +10,10 @@ export const dynamic = "force-dynamic";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 // Allowed image types
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ALLOWED_TYPES = [
+  "image/jpeg", "image/jpg", "image/png", "image/webp",
+  "video/mp4", "video/webm", "video/ogg"
+];
 
 export async function POST(request: NextRequest) {
   try {

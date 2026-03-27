@@ -151,7 +151,23 @@ async function transformOrderItems(items: OrderItem[]): Promise<ShipRocketOrderI
 function resolveShipRocketPaymentMethod(order: Order): string {
   return order.payment_method === 'cod' ? 'COD' : 'Prepaid';
 }
-
+// Utility — add near top of the file
+function sanitizePhoneForShipRocket(phone: string): string {
+  // Strip +, spaces, dashes, parens — keep only digits
+  const digits = phone.replace(/\D/g, "")
+  
+  // If someone stored with country code prefix (e.g. 919867462121), strip it
+  // Indian numbers: if 12 digits starting with 91, take last 10
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2)
+  }
+  // If 11 digits starting with 0 (old STD style), take last 10
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1)
+  }
+  // Otherwise return as-is (handles 10-digit clean numbers)
+  return digits
+}
 /**
  * Create ShipRocket order from Supabase order
  */
@@ -229,7 +245,7 @@ export async function createShipRocketOrder(orderId: string) {
       billing_state: formatStateName(shippingAddress.state),
       billing_country: shippingAddress.country || 'India',
       billing_email: userEmail,
-      billing_phone: shippingAddress.phone,
+      billing_phone: sanitizePhoneForShipRocket(order.shipping_address.phone),
       shipping_is_billing: true,
       order_items: orderItems,
       payment_method: shipRocketPaymentMethod,    // ✅ 'COD' or 'Prepaid'

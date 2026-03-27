@@ -1,18 +1,19 @@
-// components/Trending-categories.tsx - WITH MOBILE CAROUSEL
+// components/Trending-categories.tsx - WITH MOBILE CAROUSEL + HOVER IMAGE SWAP
 
 "use client"
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { getProducts } from "@/lib/supabase"
 import { formatPrice, addSlugToProduct } from "@/utils/helpers"
 import type { Product } from "@/lib/types"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import Image from "next/image"
 
 export default function TrendingCategories() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [hoveredId, setHoveredId] = useState<number | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -21,7 +22,6 @@ export default function TrendingCategories() {
 
   const loadTrendingProducts = async () => {
     try {
-      // Get latest 4 products (trending/new arrivals)
       const allProducts = await getProducts()
       const trendingProducts = allProducts
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -38,35 +38,31 @@ export default function TrendingCategories() {
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
-      const scrollAmount = scrollContainerRef.current.offsetWidth;
+      const scrollAmount = scrollContainerRef.current.offsetWidth
       scrollContainerRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
-      });
+      })
     }
-  };
+  }
 
-// Helper function to get color hex value
   const getColorHex = (color: string | { name?: string; hex: string }): string => {
     if (typeof color === 'string') {
-      // Old format: string color
-      return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
+      return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase()
     } else if (color && typeof color === 'object' && color.hex) {
-      // New format: {name, hex}
-      return color.hex;
+      return color.hex
     }
-    return '#000000'; // fallback
-  };
+    return '#000000'
+  }
 
-  // Helper function to get color title
   const getColorTitle = (color: string | { name?: string; hex: string }): string => {
     if (typeof color === 'string') {
-      return color;
+      return color
     } else if (color && typeof color === 'object') {
-      return color.name ? `${color.name} (${color.hex})` : color.hex;
+      return color.name ? `${color.name} (${color.hex})` : color.hex
     }
-    return 'Color';
-  };
+    return 'Color'
+  }
 
   if (loading) {
     return (
@@ -76,7 +72,7 @@ export default function TrendingCategories() {
             <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
             <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
           </div>
-          
+
           {/* Mobile Skeleton */}
           <div className="md:hidden">
             <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
@@ -112,6 +108,7 @@ export default function TrendingCategories() {
   return (
     <section className="bg-[#E3D9C6] py-12 md:py-32 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8 md:mb-20">
           <h2 className="text-xs md:text-sm font-bold tracking-widest text-gray-900 uppercase">
@@ -127,7 +124,7 @@ export default function TrendingCategories() {
 
         {/* Mobile Carousel */}
         <div className="md:hidden relative mb-8">
-          <div 
+          <div
             ref={scrollContainerRef}
             className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4"
             style={{
@@ -137,30 +134,32 @@ export default function TrendingCategories() {
             }}
           >
             {products.map((product) => (
-              <Link 
-                key={product.id} 
+              <Link
+                key={product.id}
                 href={`/products/${product.slug}`}
                 className="shrink-0 w-[90vw] snap-start"
               >
                 <div className="group cursor-pointer">
                   <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
-                    <img
+                    {/* Primary image */}
+                    <Image
                       src={product.image_url || "/placeholder.svg"}
                       alt={product.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
+
                     <div className="absolute inset-0 bg-black/5" />
 
                     {/* Navigation Dot Indicator */}
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                       {products.map((_, idx) => (
-                        <div 
+                        <div
                           key={idx}
-                          className={`w-2 h-2 rounded-full ${
-                            idx === products.indexOf(product) 
-                              ? 'bg-white' 
+                          className={`w-2 h-2 rounded-full ${idx === products.indexOf(product)
+                              ? 'bg-white'
                               : 'bg-white/50'
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -198,9 +197,7 @@ export default function TrendingCategories() {
                         <div
                           key={idx}
                           className="w-4 h-4 rounded-full border border-gray-300"
-                          style={{
-                            backgroundColor: getColorHex(color)
-                          }}
+                          style={{ backgroundColor: getColorHex(color) }}
                           title={getColorTitle(color)}
                         />
                       ))}
@@ -239,13 +236,35 @@ export default function TrendingCategories() {
         <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10 mb-12">
           {products.map((product) => (
             <Link key={product.id} href={`/products/${product.slug}`}>
-              <div className="group cursor-pointer">
-                <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
-                  <img
+              <div
+                className="group cursor-pointer"
+                onMouseEnter={() => setHoveredId(product.id)}
+                onMouseLeave={() => setHoveredId(null)}
+              >
+                <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
+
+                  {/* Primary Image */}
+                  <Image
                     src={product.image_url || "/placeholder.svg"}
                     alt={product.name}
-                    className="w-full h-full object-cover"
+                    fill
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${hoveredId === product.id && product.images?.[1]
+                        ? 'opacity-0'
+                        : 'opacity-100'
+                      }`}
                   />
+
+                  {/* Hover Image (second image if available) */}
+                  {product.images?.[1] && (
+                    <Image
+                      src={typeof product.images[1] === 'string' ? product.images[1] : (product.images[1] as { image_url?: string }).image_url || product.images[1]}
+                      alt={`${product.name} - alternate view`}
+                      fill
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${hoveredId === product.id ? 'opacity-100' : 'opacity-0'
+                        }`}
+                    />
+                  )}
+
                   <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300" />
 
                   {product.stock === 0 && (
@@ -281,9 +300,7 @@ export default function TrendingCategories() {
                       <div
                         key={idx}
                         className="w-4 h-4 rounded-full border border-gray-300"
-                        style={{
-                          backgroundColor: getColorHex(color)
-                        }}
+                        style={{ backgroundColor: getColorHex(color) }}
                         title={getColorTitle(color)}
                       />
                     ))}

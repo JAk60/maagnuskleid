@@ -1,4 +1,6 @@
-// lib/supabase-orders.ts - UPDATED WITH COD SUPPORT
+// src/lib/supabase-orders.ts - UPDATED WITH COUPON SUPPORT
+// Only the Order interface and createOrder function are changed.
+// Everything else (Address, getAddresses, etc.) remains identical.
 
 import { supabase } from './supabase'
 import { validateStock, updateProductStock, restoreProductStock } from './inventory'
@@ -39,20 +41,23 @@ export interface Order {
   id?: string
   user_id: string
   order_number?: string
-
-  /** ✅ Email belongs to Order, NOT Address */
   customer_email?: string
 
   items: OrderItem[]
   subtotal: number
   tax: number
   shipping_cost: number
-  cod_charge: number   // ✅ NEW: ₹100 for COD, 0 for Razorpay
+  cod_charge: number
   total: number
+
+  // ✅ Coupon fields
+  coupon_code?: string | null
+  coupon_id?: string | null
+  discount_amount?: number
 
   shipping_address: Address
 
-  payment_method: 'razorpay' | 'cod'  // ✅ Strict union instead of plain string
+  payment_method: 'razorpay' | 'cod'
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded'
 
   razorpay_order_id?: string
@@ -74,7 +79,6 @@ export interface Order {
   delivered_at?: string
 }
 
-
 // ========== ADDRESS FUNCTIONS ==========
 
 export async function getAddresses(userId: string) {
@@ -83,10 +87,10 @@ export async function getAddresses(userId: string) {
     .select('*')
     .eq('user_id', userId)
     .order('is_default', { ascending: false })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
 
-  if (error) throw error;
-  return data as Address[];
+  if (error) throw error
+  return data as Address[]
 }
 
 export async function getDefaultAddress(userId: string) {
@@ -95,10 +99,10 @@ export async function getDefaultAddress(userId: string) {
     .select('*')
     .eq('user_id', userId)
     .eq('is_default', true)
-    .single();
+    .single()
 
-  if (error && error.code !== 'PGRST116') throw error;
-  return data as Address | null;
+  if (error && error.code !== 'PGRST116') throw error
+  return data as Address | null
 }
 
 export async function createAddress(address: Omit<Address, 'id' | 'created_at' | 'updated_at'>) {
@@ -106,17 +110,17 @@ export async function createAddress(address: Omit<Address, 'id' | 'created_at' |
     await supabase
       .from('addresses')
       .update({ is_default: false })
-      .eq('user_id', address.user_id);
+      .eq('user_id', address.user_id)
   }
 
   const { data, error } = await supabase
     .from('addresses')
     .insert(address)
     .select()
-    .single();
+    .single()
 
-  if (error) throw error;
-  return data as Address;
+  if (error) throw error
+  return data as Address
 }
 
 export async function updateAddress(id: string, updates: Partial<Address>) {
@@ -124,7 +128,7 @@ export async function updateAddress(id: string, updates: Partial<Address>) {
     await supabase
       .from('addresses')
       .update({ is_default: false })
-      .eq('user_id', updates.user_id);
+      .eq('user_id', updates.user_id)
   }
 
   const { data, error } = await supabase
@@ -132,85 +136,63 @@ export async function updateAddress(id: string, updates: Partial<Address>) {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
-    .single();
+    .single()
 
-  if (error) throw error;
-  return data as Address;
+  if (error) throw error
+  return data as Address
 }
 
 export async function deleteAddress(id: string) {
-  const { error } = await supabase
-    .from('addresses')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  const { error } = await supabase.from('addresses').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ========== ORDER FUNCTIONS ==========
 
-const orderCreationLimits = new Map<string, { count: number; resetTime: number }>();
+const orderCreationLimits = new Map<string, { count: number; resetTime: number }>()
 
 function checkOrderCreationLimit(userId: string): { allowed: boolean; message?: string } {
-  const now = Date.now();
-  const userLimit = orderCreationLimits.get(userId);
-
-  const LIMIT = 3;
-  const WINDOW = 10 * 60 * 1000;
+  const now = Date.now()
+  const userLimit = orderCreationLimits.get(userId)
+  const LIMIT = 3
+  const WINDOW = 10 * 60 * 1000
 
   if (!userLimit || userLimit.resetTime < now) {
-    orderCreationLimits.set(userId, {
-      count: 1,
-      resetTime: now + WINDOW,
-    });
-    return { allowed: true };
+    orderCreationLimits.set(userId, { count: 1, resetTime: now + WINDOW })
+    return { allowed: true }
   }
 
   if (userLimit.count >= LIMIT) {
-    const minutesLeft = Math.ceil((userLimit.resetTime - now) / 1000 / 60);
+    const minutesLeft = Math.ceil((userLimit.resetTime - now) / 1000 / 60)
     return {
       allowed: false,
       message: `Too many orders. Please wait ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'} before placing another order.`
-    };
-  }
-
-  userLimit.count++;
-  return { allowed: true };
-}
-
-export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) {
-  // Check rate limit
-  const rateLimitCheck = checkOrderCreationLimit(order.user_id);
-  if (!rateLimitCheck.allowed) {
-    throw new Error(rateLimitCheck.message || 'Rate limit exceeded');
-  }
-
-  // Validate order data
-  if (!order.user_id) {
-    throw new Error('User ID is required');
-  }
-
-  if (!order.items || order.items.length === 0) {
-    throw new Error('Order must contain at least one item');
-  }
-
-  if (order.total <= 0) {
-    throw new Error('Invalid order total');
-  }
-
-  if (!order.shipping_address) {
-    throw new Error('Shipping address is required');
-  }
-
-  // Validate each item
-  for (const item of order.items) {
-    if (!item.product_id || !item.product_name || item.quantity <= 0 || item.price <= 0) {
-      throw new Error(`Invalid item data for ${item.product_name}`);
     }
   }
 
-  // ✅ STEP 1: Validate stock availability
-  console.log('📦 Validating stock availability...');
+  userLimit.count++
+  return { allowed: true }
+}
+
+export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) {
+  // Rate limit check
+  const rateLimitCheck = checkOrderCreationLimit(order.user_id)
+  if (!rateLimitCheck.allowed) throw new Error(rateLimitCheck.message || 'Rate limit exceeded')
+
+  // Basic validation
+  if (!order.user_id) throw new Error('User ID is required')
+  if (!order.items || order.items.length === 0) throw new Error('Order must contain at least one item')
+  if (order.total <= 0) throw new Error('Invalid order total')
+  if (!order.shipping_address) throw new Error('Shipping address is required')
+
+  for (const item of order.items) {
+    if (!item.product_id || !item.product_name || item.quantity <= 0 || item.price <= 0) {
+      throw new Error(`Invalid item data for ${item.product_name}`)
+    }
+  }
+
+  // ✅ STEP 1: Validate stock
+  console.log('📦 Validating stock availability...')
   const stockValidation = await validateStock(
     order.items.map(item => ({
       product_id: item.product_id,
@@ -218,76 +200,42 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
       size: item.size,
       color: item.color
     }))
-  );
+  )
 
   if (!stockValidation.valid) {
-    throw new Error(`Stock validation failed: ${stockValidation.errors.join(', ')}`);
+    throw new Error(`Stock validation failed: ${stockValidation.errors.join(', ')}`)
   }
 
-  // ✅ STEP 2: Determine initial order_status based on payment method
-  // COD orders are immediately confirmed since no payment gateway is involved
-  // Razorpay orders stay 'pending' until payment is verified
-  const initialOrderStatus = order.payment_method === 'cod' ? 'confirmed' : 'pending';
-
-  // ✅ STEP 3: Generate order number and create order in database
-  console.log('📝 Creating order in database...');
-
-  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+  // ✅ STEP 2: Create order
+  console.log('📝 Creating order in database...')
+  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`
+  const initialOrderStatus = order.payment_method === 'cod' ? 'confirmed' : 'pending'
 
   const orderWithNumber = {
     ...order,
     order_number: orderNumber,
     order_status: initialOrderStatus,
     cod_charge: order.cod_charge ?? 0,
-  };
-
-  console.log('Order data:', {
-    order_number: orderNumber,
-    user_id: order.user_id,
-    items_count: order.items.length,
-    total: order.total,
-    payment_method: order.payment_method,
-    cod_charge: order.cod_charge,
-    initial_status: initialOrderStatus,
-    has_shipping_address: !!order.shipping_address
-  });
+    coupon_code: order.coupon_code ?? null,
+    coupon_id: order.coupon_id ?? null,
+    discount_amount: order.discount_amount ?? 0,
+  }
 
   const { data, error } = await supabase
     .from('orders')
     .insert(orderWithNumber)
     .select()
-    .single();
+    .single()
 
   if (error) {
-    console.error('❌ Order creation error details:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-      fullError: JSON.stringify(error, null, 2)
-    });
-
-    let errorMessage = 'Failed to create order';
-
-    if (error.message) {
-      errorMessage = error.message;
-    } else if (error.details) {
-      errorMessage = `Database error: ${error.details}`;
-    } else if (error.code) {
-      errorMessage = `Database error code: ${error.code}`;
-    } else {
-      errorMessage = 'Failed to create order. Please check that all required fields are provided.';
-    }
-
-    throw new Error(errorMessage);
+    console.error('❌ Order creation error:', error)
+    throw new Error(error.message || 'Failed to create order')
   }
 
-  if (!data) {
-    throw new Error('Order created but no data returned from database');
-  }
+  if (!data) throw new Error('Order created but no data returned')
 
-  // ✅ STEP 4: Update product stock
-  console.log('📉 Updating product inventory...');
+  // ✅ STEP 3: Update product stock
+  console.log('📉 Updating product inventory...')
   try {
     const stockUpdate = await updateProductStock(
       order.items.map(item => ({
@@ -296,27 +244,43 @@ export async function createOrder(order: Omit<Order, 'id' | 'order_number' | 'cr
         size: item.size,
         color: item.color
       }))
-    );
+    )
 
     if (!stockUpdate.success) {
-      console.error('❌ Stock update failed:', stockUpdate.errors);
-
-      console.log('🔄 Rolling back order creation...');
-      await supabase.from('orders').delete().eq('id', data.id);
-
-      throw new Error(`Stock update failed: ${stockUpdate.errors.join(', ')}. Order has been cancelled.`);
+      console.error('❌ Stock update failed:', stockUpdate.errors)
+      await supabase.from('orders').delete().eq('id', data.id)
+      throw new Error(`Stock update failed: ${stockUpdate.errors.join(', ')}`)
     }
   } catch (stockError) {
-    console.error('❌ Stock update exception:', stockError);
-
-    console.log('🔄 Rolling back order creation due to exception...');
-    await supabase.from('orders').delete().eq('id', data.id);
-
-    throw new Error(`Failed to update inventory: ${stockError instanceof Error ? stockError.message : 'Unknown error'}. Order has been cancelled.`);
+    console.error('❌ Stock update exception:', stockError)
+    await supabase.from('orders').delete().eq('id', data.id)
+    throw new Error(`Failed to update inventory: ${stockError instanceof Error ? stockError.message : 'Unknown error'}`)
   }
 
-  console.log('✅ Order created successfully with inventory updated:', data.id);
-  return data as Order;
+  // ✅ STEP 4: Record coupon usage and increment used_count
+  if (order.coupon_id && order.coupon_code) {
+    console.log('🏷️ Recording coupon usage...')
+    try {
+      // Insert usage record
+      await supabase.from('coupon_usages').insert({
+        coupon_id: order.coupon_id,
+        user_id: order.user_id,
+        order_id: data.id,
+        discount_amount: order.discount_amount ?? 0,
+      })
+
+      // Increment used_count on the coupon
+      await supabase.rpc('increment_coupon_usage', { coupon_uuid: order.coupon_id })
+
+      console.log(`✅ Coupon ${order.coupon_code} usage recorded`)
+    } catch (couponErr) {
+      // Non-critical — log but don't fail the order
+      console.error('⚠️ Failed to record coupon usage (non-critical):', couponErr)
+    }
+  }
+
+  console.log('✅ Order created successfully:', data.id)
+  return data as Order
 }
 
 export async function getOrders(userId: string) {
@@ -324,10 +288,10 @@ export async function getOrders(userId: string) {
     .from('orders')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
 
-  if (error) throw error;
-  return data as Order[];
+  if (error) throw error
+  return data as Order[]
 }
 
 export async function getOrderById(orderId: string) {
@@ -335,19 +299,19 @@ export async function getOrderById(orderId: string) {
     .from('orders')
     .select('*')
     .eq('id', orderId)
-    .single();
+    .single()
 
-  if (error) throw error;
-  return data as Order;
+  if (error) throw error
+  return data as Order
 }
 
 export async function updateOrderPayment(
   orderId: string,
   paymentData: {
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-    payment_status: 'paid' | 'failed';
-    paid_at?: string;
+    razorpay_payment_id: string
+    razorpay_signature: string
+    payment_status: 'paid' | 'failed'
+    paid_at?: string
   }
 ) {
   const { data, error } = await supabase
@@ -359,36 +323,36 @@ export async function updateOrderPayment(
     })
     .eq('id', orderId)
     .select()
-    .single();
+    .single()
 
-  if (error) throw error;
-  return data as Order;
+  if (error) throw error
+  return data as Order
 }
 
 export async function updateOrderStatus(orderId: string, status: Order['order_status']) {
   const updates: Partial<Order> & { updated_at: string } = {
     order_status: status,
     updated_at: new Date().toISOString(),
-  };
+  }
 
-  if (status === 'shipped') updates.shipped_at = new Date().toISOString();
-  if (status === 'delivered') updates.delivered_at = new Date().toISOString();
+  if (status === 'shipped') updates.shipped_at = new Date().toISOString()
+  if (status === 'delivered') updates.delivered_at = new Date().toISOString()
 
   const { data, error } = await supabase
     .from('orders')
     .update(updates)
     .eq('id', orderId)
     .select()
-    .single();
+    .single()
 
-  if (error) throw error;
-  return data as Order;
+  if (error) throw error
+  return data as Order
 }
 
 export async function cancelOrder(orderId: string) {
-  const order = await getOrderById(orderId);
+  const order = await getOrderById(orderId)
 
-  console.log('📈 Restoring product inventory...');
+  console.log('📈 Restoring product inventory...')
   const stockRestore = await restoreProductStock(
     order.items.map(item => ({
       product_id: item.product_id,
@@ -396,11 +360,11 @@ export async function cancelOrder(orderId: string) {
       size: item.size,
       color: item.color
     }))
-  );
+  )
 
   if (!stockRestore.success) {
-    console.error('⚠️ Stock restore had errors:', stockRestore.errors);
+    console.error('⚠️ Stock restore had errors:', stockRestore.errors)
   }
 
-  return updateOrderStatus(orderId, 'cancelled');
+  return updateOrderStatus(orderId, 'cancelled')
 }

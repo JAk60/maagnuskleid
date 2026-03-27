@@ -14,7 +14,9 @@ import {
   Bell,
   Search,
   ChevronDown,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Video,
+  Tag
 } from 'lucide-react';
 import DashboardOverview from '../dashboardOverview';
 import SettingsPage from '../SettingsPage';
@@ -27,6 +29,8 @@ import CategoryManagement from '../CategoriesManagement';
 import ExchangeManagement from '../ExchangeManagement';
 import StockAlerts from '../StockAlerts';
 import ShipRocketManagement from '../shiprocketmanage';
+import HeroVideoManagement from '../Herovideomanagement ';
+import CouponsManagement from '../Couponsmanagement';
 export default function AdminDashboard() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -36,6 +40,8 @@ export default function AdminDashboard() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'hero-videos', label: 'Hero Videos', icon: Video },
+    { id: 'coupons', label: 'Coupons', icon: Tag },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingCart },
     { id: 'exchanges', label: 'Exchanges', icon: ArrowLeftRight },
@@ -71,6 +77,10 @@ export default function AdminDashboard() {
     switch (activeMenu) {
       case 'dashboard':
         return <DashboardOverview />;
+      case 'hero-videos':
+        return <HeroVideoManagement />;
+      case 'coupons':
+        return <CouponsManagement />;
       case 'products':
         return <ProductsManagement />;
       case 'orders':

@@ -9,6 +9,7 @@ import { getOrders, getAddresses, createAddress, updateAddress, deleteAddress, t
 import Link from "next/link"
 import { User, MapPin, Package, Plus, Edit, Trash2, Check } from "lucide-react"
 import toast from "react-hot-toast"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 export default function ProfilePage() {
   const { isLoggedIn, user } = useAuth()
@@ -78,11 +79,11 @@ export default function ProfilePage() {
           user_id: user!.id,
         })
       }
-      
+
       // Reload addresses
       const addressesData = await getAddresses(user!.id)
       setAddresses(addressesData)
-      
+
       // Reset form
       setShowAddressForm(false)
       setEditingAddress(null)
@@ -172,27 +173,24 @@ export default function ProfilePage() {
             <div className="border border-border rounded-lg p-4 space-y-2">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === "profile" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "profile" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  }`}
               >
                 <User className="w-5 h-5" />
                 Profile
               </button>
               <button
                 onClick={() => setActiveTab("addresses")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === "addresses" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "addresses" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  }`}
               >
                 <MapPin className="w-5 h-5" />
                 Addresses
               </button>
               <button
                 onClick={() => setActiveTab("orders")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === "orders" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "orders" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  }`}
               >
                 <Package className="w-5 h-5" />
                 Orders
@@ -270,13 +268,11 @@ export default function ProfilePage() {
                         onChange={handleAddressFormChange}
                         className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                       />
-                      <input
-                        type="tel"
-                        name="phone"
-                        placeholder="Phone Number"
+                      <PhoneInput
                         value={addressForm.phone}
-                        onChange={handleAddressFormChange}
-                        className="md:col-span-2 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                        onChange={(val) => setAddressForm(prev => ({ ...prev, phone: val }))}
+                        placeholder="Phone Number *"
+                        required
                       />
                       <input
                         type="text"

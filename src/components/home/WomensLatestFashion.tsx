@@ -22,6 +22,7 @@ export default function WomensLatestFashion() {
     try {
       // Get latest 8 women products
       const allProducts = await getProducts();
+      console.log('allProducts', allProducts)
       const womensProducts = allProducts
         .filter(p => p.gender === "Female")
         .sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime())

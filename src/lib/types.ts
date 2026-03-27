@@ -12,24 +12,41 @@ export interface SizeChartEntry {
 }
 
 
-export interface Product {
-	size_chart: SizeChartEntry[];
-	has_size_chart: boolean;
-	id: number;
-	name: string;
-	description: string;
-	price: number;
-	image_url: string;
-	images?: string[]; // For future multiple images support
-	category: string;
-	sizes: string[];
-	colors: string[];
-	stock: number;
-	created_at: string;
-	gender: "Male" | "Female";
-	slug?: string; // Generated from name
+// Add this new interface above Product
+export interface ProductImage {
+  id: string;
+  product_id: number;
+  image_url: string;
+  display_order: number;
+  is_primary: boolean;
+  created_at: string;
 }
 
+export interface Product {
+  size_chart: SizeChartEntry[];
+  has_size_chart: boolean;
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  images?: ProductImage[];  // ← was string[], now the real shape
+  category: string;
+  sizes: string[];
+  colors: (string | { name?: string; hex: string })[];  // ← fix this too, your card already handles both but the type said string[]
+  stock: number;
+  created_at: string;
+  updated_at?: string;
+  gender: "Male" | "Female";
+  slug?: string;
+  // extras from real data
+  category_id?: number | null;
+  weight?: number;
+  length?: number;
+  breadth?: number;
+  height?: number;
+  sku?: string;
+}
 export interface FilterState {
 	gender: string[];
 	categories: string[];

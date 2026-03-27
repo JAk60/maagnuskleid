@@ -1,3 +1,4 @@
+import ProductDescription from "@/components/products/ProductDescription";
 import { Category } from "@/lib/categories-db";
 import { ChevronDown, ChevronUp, Edit, Image as ImageIcon, Package, Plus, Ruler, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
@@ -685,7 +686,7 @@ export default function ProductsManagement() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-semibold text-lg">{product.name}</h3>
-                    <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
+                    <ProductDescription description={product.description} />
                   </div>
                   <div className="flex gap-2">
                     <button
