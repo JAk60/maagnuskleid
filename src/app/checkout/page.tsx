@@ -1,4 +1,4 @@
-// src/app/checkout/page.tsx - UPDATED WITH COUPON SUPPORT
+// src/app/checkout/page.tsx
 
 "use client"
 
@@ -59,6 +59,48 @@ interface ErrorResponse {
 }
 
 // =====================
+// Shared Place Order Button
+// =====================
+
+function PlaceOrderButton({
+  onClick,
+  disabled,
+  loading,
+  paymentMethod,
+  finalTotal,
+  className = "",
+}: {
+  onClick: () => void
+  disabled: boolean
+  loading: boolean
+  paymentMethod: PaymentMethod
+  finalTotal: number
+  className?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${className}`}
+    >
+      {loading ? (
+        <>
+          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Processing...
+        </>
+      ) : paymentMethod === "cod" ? (
+        `Place Order — Pay ₹${finalTotal.toFixed(2)} on Delivery`
+      ) : (
+        `Pay ₹${finalTotal.toFixed(2)} with Razorpay`
+      )}
+    </button>
+  )
+}
+
+// =====================
 // Component
 // =====================
 
@@ -95,12 +137,11 @@ export default function CheckoutPage() {
     is_default: false,
   })
 
-  // ✅ Reactive totals
   const shippingCost = 0
   const codCharge = paymentMethod === "cod" ? COD_FEE : 0
   const finalTotal = total - discountAmount + shippingCost + codCharge
 
-  // Re-validate coupon when payment method changes (COD restriction)
+  // Re-validate coupon when payment method changes
   useEffect(() => {
     if (appliedCoupon) {
       handleApplyCoupon(couponInput, paymentMethod)
@@ -108,12 +149,13 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentMethod])
 
+  // ✅ FIX: Auto-select default address, fallback to first address if none marked default
   const loadAddresses = useCallback(async () => {
     if (!user) return
     try {
       const userAddresses = await getAddresses(user.id)
       setAddresses(userAddresses)
-      const defaultAddr = userAddresses.find(addr => addr.is_default)
+      const defaultAddr = userAddresses.find(addr => addr.is_default) ?? userAddresses[0] ?? null
       if (defaultAddr) setSelectedAddress(defaultAddr)
     } catch (err) {
       console.error("Failed to load addresses:", err)
@@ -130,15 +172,8 @@ export default function CheckoutPage() {
 
   const handleApplyCoupon = async (code: string, method?: PaymentMethod) => {
     const codeToApply = code.trim().toUpperCase()
-    if (!codeToApply) {
-      setCouponError("Please enter a coupon code")
-      return
-    }
-
-    if (!user) {
-      setCouponError("Please log in to apply a coupon")
-      return
-    }
+    if (!codeToApply) { setCouponError("Please enter a coupon code"); return }
+    if (!user) { setCouponError("Please log in to apply a coupon"); return }
 
     setCouponLoading(true)
     setCouponError("")
@@ -190,15 +225,14 @@ export default function CheckoutPage() {
 
   const handleAddressFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    setAddressForm(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value
-    }))
+    setAddressForm(prev => ({ ...prev, [name]: type === "checkbox" ? checked : value }))
   }
 
   const handleSaveAddress = async () => {
-    if (!addressForm.first_name || !addressForm.last_name || !addressForm.phone ||
-      !addressForm.address_line1 || !addressForm.city || !addressForm.state || !addressForm.postal_code) {
+    if (
+      !addressForm.first_name || !addressForm.last_name || !addressForm.phone ||
+      !addressForm.address_line1 || !addressForm.city || !addressForm.state || !addressForm.postal_code
+    ) {
       setError("Please fill in all required address fields")
       return
     }
@@ -290,42 +324,15 @@ export default function CheckoutPage() {
       const razorpayLoaded = await initializeRazorpay()
       if (!razorpayLoaded) throw new Error("Failed to load payment gateway.")
 
-      const order = await createOrder({
-        user_id: user.id,
-        items: items.map(item => ({
-          product_id: item?.id,
-          product_name: item.name,
-          product_image: item.image,
-          size: item.size,
-          color: item.color,
-          quantity: item.quantity,
-          price: item.price,
-          subtotal: item.price * item.quantity,
-        })),
-        subtotal: total,
-        tax: 0,
-        shipping_cost: shippingCost,
-        cod_charge: 0,
-        total: finalTotal,
-        coupon_code: appliedCoupon?.code ?? null,
-        coupon_id: appliedCoupon?.id ?? null,
-        discount_amount: discountAmount,
-        shipping_address: selectedAddress,
-        payment_method: "razorpay",
-        payment_status: "pending",
-        order_status: "pending",
-      })
-
-      if (!order?.id || !order?.order_number) throw new Error("Failed to create order")
-
+      // STEP 1: Create Razorpay order only — no Supabase order yet
       const response = await fetch("/api/razorpay/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: finalTotal,
           currency: "INR",
-          receipt: order.order_number,
-          notes: { order_id: order.id, user_id: user.id },
+          receipt: `receipt_${Date.now()}`,
+          notes: { user_id: user.id },
         }),
       })
 
@@ -333,7 +340,6 @@ export default function CheckoutPage() {
         const errorData = await response.json().catch(() => ({ error: "Too many attempts" })) as ErrorResponse
         throw new Error(errorData.error || "Too many payment attempts.")
       }
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({})) as ErrorResponse
         throw new Error(errorData.error || `Payment gateway error (${response.status})`)
@@ -342,29 +348,60 @@ export default function CheckoutPage() {
       const data = await response.json() as RazorpayOrderResponse
       if (!data.success || !data.order) throw new Error("Invalid response from payment server")
 
+      // STEP 2: Open Razorpay modal
       openRazorpayCheckout(
         {
           orderId: data.order.id,
           amount: data.order.amount,
           currency: data.order.currency,
           name: "Magnus Kleid",
-          description: `Order #${order.order_number}`,
+          description: "Order payment",
           prefill: {
             name: `${selectedAddress.first_name} ${selectedAddress.last_name}`,
             email: user.email || "",
             contact: selectedAddress.phone,
           },
-          notes: { order_id: order.id },
+          notes: { user_id: user.id },
         },
-        async (response) => {
+        async (razorpayResponse) => {
+          // STEP 3: Payment succeeded — NOW create Supabase order
           try {
+            const order = await createOrder({
+              user_id: user.id,
+              items: items.map(item => ({
+                product_id: item?.id,
+                product_name: item.name,
+                product_image: item.image,
+                size: item.size,
+                color: item.color,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.price * item.quantity,
+              })),
+              subtotal: total,
+              tax: 0,
+              shipping_cost: shippingCost,
+              cod_charge: 0,
+              total: finalTotal,
+              coupon_code: appliedCoupon?.code ?? null,
+              coupon_id: appliedCoupon?.id ?? null,
+              discount_amount: discountAmount,
+              shipping_address: selectedAddress,
+              payment_method: "razorpay",
+              payment_status: "pending",
+              order_status: "pending",
+            })
+
+            if (!order?.id || !order?.order_number) throw new Error("Failed to create order record")
+
+            // STEP 4: Verify payment signature
             const verifyResponse = await fetch("/api/razorpay/verify-payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
+                razorpay_order_id: razorpayResponse.razorpay_order_id,
+                razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                razorpay_signature: razorpayResponse.razorpay_signature,
                 order_id: order.id,
               }),
             })
@@ -374,10 +411,14 @@ export default function CheckoutPage() {
               clearCart()
               router.push(`/order-success?orderId=${order.id}&orderNumber=${order.order_number}`)
             } else {
-              setError(`Payment verification failed. Order ID: ${order.order_number}. Please contact support.`)
+              setError(`Payment verified but order update failed. Order: ${order.order_number}. Contact support.`)
             }
-          } catch (verifyError) {
-            setError(`Verification failed. Order: ${order.order_number}. Contact support.`)
+          } catch (err) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : `Order creation failed after payment. Contact support with payment ID: ${razorpayResponse.razorpay_payment_id}`
+            )
           } finally {
             setLoading(false)
           }
@@ -409,7 +450,7 @@ export default function CheckoutPage() {
   }
 
   // =====================
-  // Empty / Logged Out States
+  // Empty / Auth Guards
   // =====================
 
   if (items.length === 0) {
@@ -439,7 +480,7 @@ export default function CheckoutPage() {
   }
 
   // =====================
-  // Main Render
+  // Render
   // =====================
 
   return (
@@ -447,7 +488,7 @@ export default function CheckoutPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h1 className="text-4xl font-bold mb-8">Checkout</h1>
 
-        {/* Error Display */}
+        {/* Error Banner */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <svg className="w-5 h-5 text-red-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -462,9 +503,75 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left column */}
-          <div className="lg:col-span-2 space-y-6">
+        {/*
+          MOBILE:  flex-col — Order Summary at top, then forms, then Pay button at very bottom
+          DESKTOP: lg:grid 3-col — forms left (col-span-2), summary sticky right
+        */}
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-8">
+
+          {/* ── ORDER SUMMARY — top on mobile, right column on desktop ── */}
+          <div className="lg:col-start-3 lg:row-start-1 border border-border rounded-lg p-6 h-fit lg:sticky lg:top-20">
+            <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
+
+            <div className="space-y-4 mb-6 max-h-48 lg:max-h-96 overflow-y-auto">
+              {items.map((item) => (
+                <div key={`${item.id}-${item.size}-${item.color}`} className="flex justify-between text-sm gap-2">
+                  <span className="flex-1">
+                    {item.name}
+                    <span className="text-muted-foreground"> (Size {item.size}, {item.color}) </span>
+                    x{item.quantity}
+                  </span>
+                  <span className="font-semibold ml-2 whitespace-nowrap">₹{(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-semibold">₹{total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="font-semibold text-green-600">Free</span>
+              </div>
+              {appliedCoupon && discountAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Tag className="w-3.5 h-3.5" />
+                    Coupon ({appliedCoupon.code})
+                  </span>
+                  <span className="font-semibold text-green-600">− ₹{discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              {paymentMethod === "cod" && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">COD Handling Fee</span>
+                  <span className="font-semibold text-amber-600">+₹{COD_FEE.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="border-t border-border pt-4 flex justify-between items-end">
+                <div>
+                  <span className="font-bold text-lg block">Total</span>
+                  <span className="text-xs text-muted-foreground">All taxes included</span>
+                </div>
+                <span className="text-2xl font-bold text-primary">₹{finalTotal.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Desktop-only pay button inside summary */}
+            <PlaceOrderButton
+              onClick={handlePlaceOrder}
+              disabled={!selectedAddress || loading}
+              loading={loading}
+              paymentMethod={paymentMethod}
+              finalTotal={finalTotal}
+              className="hidden lg:flex mt-6"
+            />
+          </div>
+
+          {/* ── LEFT COLUMN: forms + mobile pay button at very bottom ── */}
+          <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1 space-y-6">
 
             {/* Delivery Address */}
             <div className="border border-border rounded-lg p-6">
@@ -480,7 +587,9 @@ export default function CheckoutPage() {
                     >
                       <p className="font-semibold">{addr.first_name} {addr.last_name}</p>
                       <p className="text-sm text-muted-foreground">{addr.phone}</p>
-                      <p className="text-sm text-muted-foreground mt-2">{addr.address_line1}{addr.address_line2 && `, ${addr.address_line2}`}</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {addr.address_line1}{addr.address_line2 && `, ${addr.address_line2}`}
+                      </p>
                       <p className="text-sm text-muted-foreground">{addr.city}, {addr.state} {addr.postal_code}</p>
                     </div>
                   ))}
@@ -521,7 +630,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* ===================== COUPON CODE SECTION ===================== */}
+            {/* Coupon Code */}
             <div className="border border-border rounded-lg p-6">
               <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                 <Tag className="w-6 h-6" />
@@ -529,7 +638,6 @@ export default function CheckoutPage() {
               </h2>
 
               {appliedCoupon ? (
-                /* Applied state */
                 <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
@@ -538,35 +646,26 @@ export default function CheckoutPage() {
                       <p className="text-sm text-green-700">{couponSuccess}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleRemoveCoupon}
-                    className="p-1.5 text-green-700 hover:text-green-900 hover:bg-green-100 rounded-full transition-colors"
-                    title="Remove coupon"
-                  >
+                  <button onClick={handleRemoveCoupon} className="p-1.5 text-green-700 hover:text-green-900 hover:bg-green-100 rounded-full transition-colors" title="Remove coupon">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               ) : (
-                /* Input state */
                 <div className="space-y-3">
-                  <div className="flex gap-3">
+                  {/* ✅ Stack vertically on mobile — no overflow clipping */}
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <input
                       type="text"
                       placeholder="Enter coupon code"
                       value={couponInput}
-                      onChange={(e) => {
-                        setCouponInput(e.target.value.toUpperCase())
-                        setCouponError("")
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleApplyCoupon(couponInput)
-                      }}
-                      className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background uppercase placeholder:normal-case"
+                      onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError("") }}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleApplyCoupon(couponInput) }}
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background uppercase placeholder:normal-case"
                     />
                     <button
                       onClick={() => handleApplyCoupon(couponInput)}
                       disabled={couponLoading || !couponInput.trim()}
-                      className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full sm:w-auto px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       {couponLoading ? (
                         <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -576,7 +675,6 @@ export default function CheckoutPage() {
                       ) : "Apply"}
                     </button>
                   </div>
-
                   {couponError && (
                     <p className="text-sm text-red-600 flex items-center gap-1">
                       <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -589,7 +687,7 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* Payment Method Selector */}
+            {/* Payment Method */}
             <div className="border border-border rounded-lg p-6">
               <h2 className="text-2xl font-bold mb-6">Payment Method</h2>
               <div className="grid sm:grid-cols-2 gap-4">
@@ -623,85 +721,21 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Place Order Button */}
-            <button
+            {/*
+              ✅ MOBILE pay button — sits at the very bottom of the form flow
+                 (after address, coupon, payment method — exactly where the user expects it)
+              ✅ DESKTOP — hidden here, button lives inside Order Summary panel on the right
+            */}
+            <PlaceOrderButton
               onClick={handlePlaceOrder}
               disabled={!selectedAddress || loading}
-              className="w-full py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
-                </>
-              ) : paymentMethod === "cod" ? (
-                `Place Order — Pay ₹${finalTotal.toFixed(2)} on Delivery`
-              ) : (
-                `Pay ₹${finalTotal.toFixed(2)} with Razorpay`
-              )}
-            </button>
+              loading={loading}
+              paymentMethod={paymentMethod}
+              finalTotal={finalTotal}
+              className="lg:hidden"
+            />
 
           </div>
-
-          {/* Order Summary */}
-          <div className="border border-border rounded-lg p-6 h-fit sticky top-20">
-            <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
-            <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-              {items.map((item) => (
-                <div key={`${item.id}-${item.size}-${item.color}`} className="flex justify-between text-sm gap-2">
-                  <span className="flex-1">
-                    {item.name}
-                    <span className="text-muted-foreground"> (Size {item.size}, {item.color}) </span>
-                    x{item.quantity}
-                  </span>
-                  <span className="font-semibold ml-2 whitespace-nowrap">₹{(item.price * item.quantity).toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t border-border pt-4 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-semibold">₹{total.toFixed(2)}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipping</span>
-                <span className="font-semibold text-green-600">Free</span>
-              </div>
-
-              {/* ✅ Discount line — only shows when coupon applied */}
-              {appliedCoupon && discountAmount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Tag className="w-3.5 h-3.5" />
-                    Coupon ({appliedCoupon.code})
-                  </span>
-                  <span className="font-semibold text-green-600">− ₹{discountAmount.toFixed(2)}</span>
-                </div>
-              )}
-
-              {/* COD fee */}
-              {paymentMethod === "cod" && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">COD Handling Fee</span>
-                  <span className="font-semibold text-amber-600">+₹{COD_FEE.toFixed(2)}</span>
-                </div>
-              )}
-
-              <div className="border-t border-border pt-4 flex justify-between items-end">
-                <div>
-                  <span className="font-bold text-lg block">Total</span>
-                  <span className="text-xs text-muted-foreground">All taxes included</span>
-                </div>
-                <span className="text-2xl font-bold text-primary">₹{finalTotal.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-
         </div>
       </div>
     </main>
