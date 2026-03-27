@@ -238,20 +238,24 @@ export function getAllColors(products: Product[]): (string | { name: string; hex
   
   products.forEach(product => {
     product.colors?.forEach(color => {
-      const colorValue = typeof color === 'string' 
-        ? color 
-        : ((color as { name?: string; hex?: string }).name || (color as { name?: string; hex?: string }).hex);
-      
-      // Use the color value as key to prevent duplicates
-      if (colorValue && !colorMap.has(colorValue)) {
-        colorMap.set(colorValue, color);
+      if (typeof color === 'string') {
+        if (!colorMap.has(color)) {
+          colorMap.set(color, color);
+        }
+      } else {
+        const key = color.name ?? color.hex;  // prefer name, fall back to hex
+        if (key && !colorMap.has(key)) {
+          colorMap.set(key, {
+            name: color.name ?? color.hex,   // guarantee name is always a string
+            hex: color.hex,
+          });
+        }
       }
     });
   });
   
   return Array.from(colorMap.values());
 }
-
 // Helper to extract category name from slug
 export function extractCategoryFromSlug(slug: string): string {
   // "mens-jersey" → "Jersey"
