@@ -157,8 +157,8 @@ export default function TrendingCategories() {
                         <div
                           key={idx}
                           className={`w-2 h-2 rounded-full ${idx === products.indexOf(product)
-                              ? 'bg-white'
-                              : 'bg-white/50'
+                            ? 'bg-white'
+                            : 'bg-white/50'
                             }`}
                         />
                       ))}
@@ -249,16 +249,15 @@ export default function TrendingCategories() {
                     alt={product.name}
                     fill
                     className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${hoveredId === product.id && product.images?.[1]
-                        ? 'opacity-0'
-                        : 'opacity-100'
+                      ? 'opacity-0'
+                      : 'opacity-100'
                       }`}
                   />
 
                   {/* Hover Image (second image if available) */}
                   {product.images?.[1] && (
                     <Image
-                      src={typeof product.images[1] === 'string' ? product.images[1] : (product.images[1] as { image_url?: string }).image_url || product.images[1]}
-                      alt={`${product.name} - alternate view`}
+                      src={typeof product.images[1] === 'string' ? product.images[1] : (product.images[1] as { image_url?: string }).image_url ?? "/placeholder.svg"} alt={`${product.name} - alternate view`}
                       fill
                       className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${hoveredId === product.id ? 'opacity-100' : 'opacity-0'
                         }`}
