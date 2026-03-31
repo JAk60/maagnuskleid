@@ -19,7 +19,6 @@ export function getSupabase(): SupabaseClient {
   return supabaseInstance;
 }
 
-// Backward compatible export - this getter ensures lazy initialization
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(target, prop) {
     const instance = getSupabase();
@@ -28,144 +27,94 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   }
 });
 
-interface RawProduct {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  gender: string;
-  stock: number;
-  has_size_chart: boolean;
-  created_at: string;
-  [key: string]: unknown;
-}
+// ─── Matches your actual schema columns exactly ──────────────────────────────
 
-// Helper function to fetch images and size chart for a product
-async function enrichProductWithDetails(product: RawProduct): Promise<Product> {
-  const client = getSupabase();
-  
-  // Fetch product images
-  const { data: images } = await client
-    .from('product_images')
-    .select('*')
-    .eq('product_id', product.id)
-    .order('display_order', { ascending: true });
+const PRODUCT_SELECT = `
+  *,
+  product_images (
+    id, product_id, image_url, display_order, is_primary, created_at
+  ),
+  size_charts (
+    id, product_id, size, chest, length, bust, length_female, notes, created_at, updated_at
+  )
+`;
 
-  // Fetch size chart if available
-  let sizeChart = [];
-  if (product.has_size_chart) {
-    const { data: chart } = await client
-      .from('size_charts')
-      .select('*')
-      .eq('product_id', product.id);
-    
-    sizeChart = chart || [];
-  }
-
+function normalizeProduct(p: Record<string, unknown>): Product {
   return {
-    ...product,
-    images: images || [],
-    size_chart: sizeChart,
+    ...p,
+    images: p.product_images ?? [],
+    size_chart: p.size_charts ?? [],
   } as Product;
 }
 
-// Fetch all products with images and size charts
-export async function getProducts() {
+export async function getProducts(): Promise<Product[]> {
   const client = getSupabase();
-  
+
   const { data, error } = await client
     .from("products")
-    .select("*")
+    .select(PRODUCT_SELECT)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  // Enrich each product with images and size chart
-  const enrichedProducts = await Promise.all(
-    (data || []).map(enrichProductWithDetails)
-  );
-
-  return enrichedProducts;
+  return (data || []).map(normalizeProduct);
 }
 
-// Fetch single product by slug with images and size chart
-export async function getProductBySlug(slug: string) {
+export async function getProductBySlug(slug: string): Promise<Product> {
   const client = getSupabase();
-  
+
   const { data, error } = await client
     .from("products")
-    .select("*")
+    .select(PRODUCT_SELECT)
     .ilike("name", slug.replace(/-/g, " "))
     .single();
 
   if (error) throw error;
-
-  return await enrichProductWithDetails(data);
+  return normalizeProduct(data);
 }
 
-// Fetch products by category with images and size charts
-export async function getProductsByCategory(categorySlug: string) {
+export async function getProductsByCategory(categorySlug: string): Promise<Product[]> {
   const client = getSupabase();
-  
+
   const parts = categorySlug.split("-");
   const gender = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   const category = parts
     .slice(1)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
-
   const categoryName = `${gender}-${category}`;
 
   const { data, error } = await client
     .from("products")
-    .select("*")
+    .select(PRODUCT_SELECT)
     .eq("category", categoryName)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  const enrichedProducts = await Promise.all(
-    (data || []).map(enrichProductWithDetails)
-  );
-
-  return enrichedProducts;
+  return (data || []).map(normalizeProduct);
 }
 
-// Fetch products by gender with images and size charts
-export async function getProductsByGender(gender: "Male" | "Female") {
+export async function getProductsByGender(gender: "Male" | "Female"): Promise<Product[]> {
   const client = getSupabase();
-  
+
   const { data, error } = await client
     .from("products")
-    .select("*")
+    .select(PRODUCT_SELECT)
     .eq("gender", gender)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  const enrichedProducts = await Promise.all(
-    (data || []).map(enrichProductWithDetails)
-  );
-
-  return enrichedProducts;
+  return (data || []).map(normalizeProduct);
 }
 
-// Search products with images and size charts
-export async function searchProducts(query: string) {
+export async function searchProducts(query: string): Promise<Product[]> {
   const client = getSupabase();
-  
+
   const { data, error } = await client
     .from("products")
-    .select("*")
+    .select(PRODUCT_SELECT)
     .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  const enrichedProducts = await Promise.all(
-    (data || []).map(enrichProductWithDetails)
-  );
-
-  return enrichedProducts;
+  return (data || []).map(normalizeProduct);
 }

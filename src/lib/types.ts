@@ -1,16 +1,18 @@
 // lib/types.ts
 
 export interface SizeChartEntry {
-	size: string;
-	chest?: number;
-	waist?: number;
-	hips?: number;
-	length?: number;
-	shoulder?: number;
-	sleeve?: number;
-	[key: string]: string | number | undefined;
+  id?: string;
+  product_id?: number;
+  size: string;
+  chest?: number;
+  length?: number;
+  bust?: number;
+  length_female?: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: string | number | undefined;
 }
-
 
 // Add this new interface above Product
 export interface ProductImage {

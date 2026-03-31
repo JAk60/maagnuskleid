@@ -1,40 +1,19 @@
-// components/Trending-categories.tsx - WITH MOBILE CAROUSEL + HOVER IMAGE SWAP
-
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { getProducts } from "@/lib/supabase"
-import { formatPrice, addSlugToProduct } from "@/utils/helpers"
+import { formatPrice } from "@/utils/helpers"
 import type { Product } from "@/lib/types"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-export default function TrendingCategories() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+interface Props {
+  products: Product[]
+}
+
+export default function TrendingCategories({ products }: Props) {
   const [hoveredId, setHoveredId] = useState<number | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    loadTrendingProducts()
-  }, [])
-
-  const loadTrendingProducts = async () => {
-    try {
-      const allProducts = await getProducts()
-      const trendingProducts = allProducts
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 4)
-        .map(addSlugToProduct)
-
-      setProducts(trendingProducts)
-    } catch (error) {
-      console.error("Failed to load trending products:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -64,46 +43,7 @@ export default function TrendingCategories() {
     return 'Color'
   }
 
-  if (loading) {
-    return (
-      <section className="py-12 md:py-32 px-4 sm:px-6 lg:px-8 bg-[#E3D9C6]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8 md:mb-20">
-            <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
-            <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
-          </div>
-
-          {/* Mobile Skeleton */}
-          <div className="md:hidden">
-            <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-              {[1, 2].map((i) => (
-                <div key={i} className="shrink-0 w-[90vw] snap-start animate-pulse">
-                  <div className="bg-gray-200 aspect-3/4 mb-4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Desktop Skeleton */}
-          <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 aspect-3/4 mb-6"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (products.length === 0) {
-    return null
-  }
+  if (products.length === 0) return null
 
   return (
     <section className="bg-[#E3D9C6] py-12 md:py-32 px-4 sm:px-6 lg:px-8">
@@ -127,11 +67,7 @@ export default function TrendingCategories() {
           <div
             ref={scrollContainerRef}
             className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch'
-            }}
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {products.map((product) => (
               <Link
@@ -140,70 +76,38 @@ export default function TrendingCategories() {
                 className="shrink-0 w-[90vw] snap-start"
               >
                 <div className="group cursor-pointer">
-                  <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
-                    {/* Primary image */}
+                  <div className="relative overflow-hidden bg-gray-100 aspect-3/4">
                     <Image
                       src={product.image_url || "/placeholder.svg"}
                       alt={product.name}
                       fill
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="object-cover"
                     />
-
                     <div className="absolute inset-0 bg-black/5" />
-
-                    {/* Navigation Dot Indicator */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                      {products.map((_, idx) => (
-                        <div
-                          key={idx}
-                          className={`w-2 h-2 rounded-full ${idx === products.indexOf(product)
-                            ? 'bg-white'
-                            : 'bg-white/50'
-                            }`}
-                        />
-                      ))}
-                    </div>
-
                     {product.stock === 0 && (
                       <div className="absolute inset-0 bg-[#E3D9C6]/80 flex items-center justify-center">
                         <span className="text-gray-900 font-bold text-lg">OUT OF STOCK</span>
                       </div>
                     )}
-
                     {product.stock > 0 && product.stock <= 5 && (
                       <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded">
                         ONLY {product.stock} LEFT
                       </div>
                     )}
                   </div>
-
                   <div className="mt-4 space-y-2 px-1">
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide line-clamp-2">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 font-semibold">
-                      {formatPrice(product.price)}
-                    </p>
-
-                    {/* Sizes */}
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide line-clamp-2">{product.name}</h3>
+                    <p className="text-sm text-gray-600 font-semibold">{formatPrice(product.price)}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span>Sizes:</span>
                       <span className="font-medium">{product.sizes.join(', ')}</span>
                     </div>
-
-                    {/* Colors */}
                     <div className="flex items-center gap-2">
                       {product.colors.slice(0, 4).map((color, idx) => (
-                        <div
-                          key={idx}
-                          className="w-4 h-4 rounded-full border border-gray-300"
-                          style={{ backgroundColor: getColorHex(color) }}
-                          title={getColorTitle(color)}
-                        />
+                        <div key={idx} className="w-4 h-4 rounded-full border border-gray-300"
+                          style={{ backgroundColor: getColorHex(color) }} title={getColorTitle(color)} />
                       ))}
-                      {product.colors.length > 4 && (
-                        <span className="text-xs text-gray-500">+{product.colors.length - 4}</span>
-                      )}
+                      {product.colors.length > 4 && <span className="text-xs text-gray-500">+{product.colors.length - 4}</span>}
                     </div>
                   </div>
                 </div>
@@ -211,21 +115,23 @@ export default function TrendingCategories() {
             ))}
           </div>
 
-          {/* Carousel Navigation Arrows */}
+          {/* Dots — single set, outside cards */}
+          <div className="flex justify-center gap-2 mt-4">
+            {products.map((_, idx) => (
+              <div key={idx} className="w-2 h-2 rounded-full bg-gray-400" />
+            ))}
+          </div>
+
           {products.length > 1 && (
             <>
-              <button
-                onClick={() => scroll('left')}
+              <button onClick={() => scroll('left')}
                 className="absolute left-2 top-1/3 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg z-10"
-                aria-label="Previous"
-              >
+                aria-label="Previous">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <button
-                onClick={() => scroll('right')}
+              <button onClick={() => scroll('right')}
                 className="absolute right-2 top-1/3 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg z-10"
-                aria-label="Next"
-              >
+                aria-label="Next">
                 <ChevronRight className="w-5 h-5" />
               </button>
             </>
@@ -242,22 +148,24 @@ export default function TrendingCategories() {
                 onMouseLeave={() => setHoveredId(null)}
               >
                 <div className="relative overflow-hidden bg-gray-100 aspect-3/4 flex items-center justify-center">
-
-                  {/* Primary Image */}
                   <Image
                     src={product.image_url || "/placeholder.svg"}
                     alt={product.name}
                     fill
                     className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${hoveredId === product.id && product.images?.[1]
-                      ? 'opacity-0'
-                      : 'opacity-100'
+                        ? 'opacity-0'
+                        : 'opacity-100'
                       }`}
                   />
 
-                  {/* Hover Image (second image if available) */}
                   {product.images?.[1] && (
                     <Image
-                      src={typeof product.images[1] === 'string' ? product.images[1] : (product.images[1] as { image_url?: string }).image_url ?? "/placeholder.svg"} alt={`${product.name} - alternate view`}
+                      src={
+                        typeof product.images[1] === 'string'
+                          ? product.images[1]
+                          : (product.images[1] as { image_url?: string }).image_url ?? "/placeholder.svg"
+                      }
+                      alt={`${product.name} - alternate view`}
                       fill
                       className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${hoveredId === product.id ? 'opacity-100' : 'opacity-0'
                         }`}
@@ -286,14 +194,10 @@ export default function TrendingCategories() {
                   <p className="text-xs md:text-sm text-gray-600 font-semibold">
                     {formatPrice(product.price)}
                   </p>
-
-                  {/* Sizes */}
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>Sizes:</span>
                     <span className="font-medium">{product.sizes.join(', ')}</span>
                   </div>
-
-                  {/* Colors */}
                   <div className="flex items-center gap-2">
                     {product.colors.slice(0, 4).map((color, idx) => (
                       <div
@@ -334,7 +238,6 @@ export default function TrendingCategories() {
         </div>
       </div>
 
-      {/* Hide scrollbar */}
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
