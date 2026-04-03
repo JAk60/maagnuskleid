@@ -17,7 +17,7 @@ interface Category {
   slug: string;
   gender: 'Male' | 'Female' | 'Unisex';
   description: string;
-  image_url: string;
+  image_url: string | null;
   display_order: number;
   is_active: boolean;
 }
@@ -45,8 +45,6 @@ export default function CategoryManagement() {
     slug: '',
     gender: 'Male' as 'Male' | 'Female' | 'Unisex',
     description: '',
-    image_url: '',
-    display_order: 0,
     is_active: true
   });
 
@@ -57,17 +55,11 @@ export default function CategoryManagement() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-
       const response = await fetch('/api/admin/categories');
       const data = (await response.json()) as CategoriesApiResponse;
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch categories');
-      }
-
+      if (!data.success) throw new Error(data.error || 'Failed to fetch categories');
       setCategories(data.data || []);
     } catch (error) {
-      console.error('Failed to load categories:', error);
       toast.error(
         'Failed to load categories: ' +
           (error instanceof Error ? error.message : 'Unknown error')
@@ -85,8 +77,6 @@ export default function CategoryManagement() {
         slug: category.slug,
         gender: category.gender,
         description: category.description || '',
-        image_url: category.image_url || '',
-        display_order: category.display_order,
         is_active: category.is_active
       });
     } else {
@@ -96,8 +86,6 @@ export default function CategoryManagement() {
         slug: '',
         gender: 'Male',
         description: '',
-        image_url: '',
-        display_order: categories.length + 1,
         is_active: true
       });
     }
@@ -117,24 +105,29 @@ export default function CategoryManagement() {
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
-    setFormData({
-      ...formData,
-      name,
-      slug: generateSlug(name)
-    });
+    setFormData({ ...formData, name, slug: generateSlug(name) });
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.slug) {
-      toast.error('Name and slug are required');
+    if (!formData.name) {
+      toast.error('Name is required');
       return;
     }
 
     try {
       const method = editingCategory ? 'PUT' : 'POST';
       const body = editingCategory
-        ? { id: editingCategory.id, ...formData }
-        : formData;
+        ? {
+            id: editingCategory.id,
+            ...formData,
+            image_url: null,
+            display_order: editingCategory.display_order
+          }
+        : {
+            ...formData,
+            image_url: null,
+            display_order: categories.length + 1
+          };
 
       const response = await fetch('/api/admin/categories', {
         method,
@@ -143,16 +136,12 @@ export default function CategoryManagement() {
       });
 
       const data = (await response.json()) as CategoryMutationResponse;
-
-      if (!data.success) {
-        throw new Error(data.error || 'Operation failed');
-      }
+      if (!data.success) throw new Error(data.error || 'Operation failed');
 
       toast.success(editingCategory ? 'Category updated!' : 'Category created!');
       await fetchCategories();
       handleCloseModal();
     } catch (error) {
-      console.error('Submit error:', error);
       toast.error(error instanceof Error ? error.message : 'An error occurred');
     }
   };
@@ -161,17 +150,10 @@ export default function CategoryManagement() {
     if (!confirm('Delete this category? Products using it will need reassignment.')) return;
 
     try {
-      const response = await fetch(`/api/admin/categories?id=${id}`, {
-        method: 'DELETE'
-      });
-
+      const response = await fetch(`/api/admin/categories?id=${id}`, { method: 'DELETE' });
       const data = (await response.json()) as CategoryMutationResponse;
-
-      if (!data.success) {
-        throw new Error(data.error || 'Delete failed');
-      }
-
-      toast.error('Category deleted!');
+      if (!data.success) throw new Error(data.error || 'Delete failed');
+      toast.success('Category deleted!');
       fetchCategories();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'An error occurred');
@@ -183,18 +165,10 @@ export default function CategoryManagement() {
       const response = await fetch('/api/admin/categories', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: category.id,
-          is_active: !category.is_active
-        })
+        body: JSON.stringify({ id: category.id, is_active: !category.is_active })
       });
-
       const data = (await response.json()) as CategoryMutationResponse;
-
-      if (!data.success) {
-        throw new Error(data.error || 'Update failed');
-      }
-
+      if (!data.success) throw new Error(data.error || 'Update failed');
       fetchCategories();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'An error occurred');
@@ -221,9 +195,7 @@ export default function CategoryManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Category Management
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Category Management</h1>
           <p className="text-gray-600 mt-1">Manage product categories</p>
         </div>
         <button
@@ -254,95 +226,158 @@ export default function CategoryManagement() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Order
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Slug
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Gender
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Status
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-gray-200">
-            {filteredCategories.map((category) => (
-              <tr key={category.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <GripVertical className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm font-medium">
-                      {category.display_order}
-                    </span>
-                  </div>
-                </td>
-
-                <td className="px-6 py-4">
-                  <p className="font-semibold">{category.name}</p>
-                  {category.description && (
-                    <p className="text-xs text-gray-500">
-                      {category.description}
-                    </p>
-                  )}
-                </td>
-
-                <td className="px-6 py-4">
-                  <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                    {category.slug}
-                  </code>
-                </td>
-
-                <td className="px-6 py-4">
-                  <span className="text-xs font-semibold">
-                    {category.gender}
-                  </span>
-                </td>
-
-                <td className="px-6 py-4">
-                  <button
-                    onClick={() => handleToggleActive(category)}
-                    className="flex items-center gap-1 text-xs"
-                  >
-                    {category.is_active ? (
-                      <Eye className="w-4 h-4" />
-                    ) : (
-                      <EyeOff className="w-4 h-4" />
-                    )}
-                    {category.is_active ? 'Active' : 'Inactive'}
-                  </button>
-                </td>
-
-                <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => handleOpenModal(category)}
-                    className="p-2 text-blue-600"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(category.id)}
-                    className="p-2 text-red-600"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+            {filteredCategories.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  No categories found
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredCategories.map((category) => (
+                <tr key={category.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm font-medium">{category.display_order}</span>
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <p className="font-semibold">{category.name}</p>
+                    {category.description && (
+                      <p className="text-xs text-gray-500">{category.description}</p>
+                    )}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-semibold">{category.gender}</span>
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => handleToggleActive(category)}
+                      className={`flex items-center gap-1 text-xs font-medium ${
+                        category.is_active ? 'text-green-600' : 'text-gray-400'
+                      }`}
+                    >
+                      {category.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      {category.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
+
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => handleOpenModal(category)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(category.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Modal remains unchanged */}
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h2 className="text-xl font-bold mb-4">
+              {editingCategory ? 'Edit Category' : 'Add Category'}
+            </h2>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={handleNameChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. T-Shirts"
+                />
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.gender}
+                  onChange={(e) =>
+                    setFormData({ ...formData, gender: e.target.value as 'Male' | 'Female' | 'Unisex' })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Unisex">Unisex</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Optional description"
+                />
+              </div>
+
+              {/* Active */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="w-4 h-4 accent-blue-600"
+                />
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">Active</label>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleCloseModal}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {editingCategory ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
