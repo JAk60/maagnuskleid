@@ -1,6 +1,6 @@
 // ========================================
 // app/api/razorpay/verify-payment/route.ts
-// PRODUCTION READY - ShipRocket Auto-Creation
+// PRODUCTION READY - ShipRocket + Meta CAPI
 // ========================================
 
 import { NextRequest, NextResponse } from "next/server"
@@ -8,6 +8,8 @@ import { verifyRazorpaySignature } from "@/lib/razorpay"
 import { updateOrderPayment } from "@/lib/supabase-orders"
 import { rateLimit, getClientIdentifier } from "@/lib/rate-limit"
 import { createShipRocketOrder } from "@/lib/shiprocket/orderService"
+import { supabaseAdmin } from "@/lib/supabase-admin"
+import crypto from "crypto"
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -27,15 +29,18 @@ interface PaymentUpdatePayload {
   paid_at: string
 }
 
+interface OrderItem {
+  product_id: number
+  quantity: number
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                  HELPERS                                   */
 /* -------------------------------------------------------------------------- */
 
 function isVerifyPaymentPayload(body: unknown): body is VerifyPaymentPayload {
   if (!body || typeof body !== "object") return false
-
   const b = body as Partial<VerifyPaymentPayload>
-
   return (
     typeof b.razorpay_order_id === "string" &&
     typeof b.razorpay_payment_id === "string" &&
@@ -48,6 +53,109 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === "string") return error
   return "Unexpected verification error"
+}
+
+function hashValue(value: string): string {
+  return crypto
+    .createHash("sha256")
+    .update(value.trim().toLowerCase())
+    .digest("hex")
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         GET USER EMAIL FROM AUTH                            */
+/* -------------------------------------------------------------------------- */
+
+async function getUserEmail(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId)
+    if (error || !data?.user?.email) return null
+    return data.user.email
+  } catch {
+    return null
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            META CAPI PURCHASE                               */
+/* -------------------------------------------------------------------------- */
+
+async function sendMetaCAPIPurchase(
+  orderId: string,
+  order: {
+    total: number
+    order_number: string
+    items: OrderItem[]
+    user_id?: string | null
+    shipping_address?: {
+      phone?: string | null
+    } | null
+  }
+): Promise<void> {
+  const metaAccessToken = process.env.META_CAPI_ACCESS_TOKEN
+  const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+
+  if (!metaAccessToken || !metaPixelId) {
+    console.warn("⚠️ Meta CAPI credentials not configured, skipping")
+    return
+  }
+
+  const eventId = `purchase_${orderId}`
+
+  // Build user_data with whatever we have
+  const userData: Record<string, string> = {}
+
+  // Get email from auth
+  if (order.user_id) {
+    const email = await getUserEmail(order.user_id)
+    if (email) {
+      userData.em = hashValue(email)
+    }
+  }
+
+  // Get phone from shipping address — use as-is, already formatted by PhoneInput
+  if (order.shipping_address?.phone) {
+    const rawPhone = order.shipping_address.phone.replace(/\D/g, "")
+    userData.ph = hashValue(rawPhone)
+  }
+  const response = await fetch(
+    `https://graph.facebook.com/v19.0/${metaPixelId}/events`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: [
+          {
+            event_name: "Purchase",
+            event_time: Math.floor(Date.now() / 1000),
+            event_id: eventId,
+            event_source_url: "https://maagnuskleid.com/order-success",
+            action_source: "website",
+            user_data: userData,
+            custom_data: {
+              value: order.total,
+              currency: "INR",
+              content_ids: order.items.map(i => String(i.product_id)),
+              content_type: "product",
+              num_items: order.items.reduce(
+                (sum, i) => sum + i.quantity,
+                0
+              ),
+              order_id: order.order_number,
+            },
+          },
+        ],
+        access_token: metaAccessToken,
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`Meta CAPI responded ${response.status}: ${err}`)
+  }
+
+  console.log("✅ Meta CAPI Purchase sent:", eventId)
 }
 
 /* -------------------------------------------------------------------------- */
@@ -69,8 +177,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Too many verification attempts. Please wait before trying again.",
+          error: "Too many verification attempts. Please wait before trying again.",
         },
         { status: 429 }
       )
@@ -111,7 +218,6 @@ export async function POST(request: NextRequest) {
 
     if (!isValid) {
       console.error("❌ Invalid payment signature for order:", order_id)
-
       return NextResponse.json(
         {
           success: false,
@@ -137,11 +243,31 @@ export async function POST(request: NextRequest) {
 
       console.log("💰 Order marked as PAID:", order_id)
 
-      /* ----------------------- CREATE SHIPROCKET ORDER ---------------------- */
+      /* ----------------------- META CAPI PURCHASE ------------------------- */
+
+      try {
+        await sendMetaCAPIPurchase(order_id, {
+          total: updatedOrder.total,
+          order_number: updatedOrder.order_number ?? order_id,
+          items: updatedOrder.items as OrderItem[],
+          user_id: updatedOrder.user_id ?? null,
+          shipping_address: updatedOrder.shipping_address as {
+            phone?: string | null
+          } | null,
+        })
+      } catch (capiError: unknown) {
+        // Non-critical — payment succeeded, just log it
+        console.error(
+          "⚠️ Meta CAPI error (non-critical):",
+          capiError instanceof Error ? capiError.message : capiError
+        )
+      }
+
+      /* ----------------------- CREATE SHIPROCKET ORDER -------------------- */
 
       try {
         console.log("🚀 Attempting ShipRocket order creation...")
-        
+
         const shipRocketResult = await createShipRocketOrder(order_id)
 
         if (shipRocketResult.success) {
@@ -179,8 +305,6 @@ export async function POST(request: NextRequest) {
 
         console.error("❌ ShipRocket error:", errorMsg)
 
-        // Payment succeeded, so we still return success
-        // Admin can manually create shipping order later
         return NextResponse.json({
           success: true,
           message:

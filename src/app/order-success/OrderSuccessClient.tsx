@@ -12,7 +12,8 @@ import {
 import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
+import { fbq } from "@/lib/meta-pixel"
 
 export default function OrderSuccessClient() {
   const searchParams = useSearchParams()
@@ -22,19 +23,39 @@ export default function OrderSuccessClient() {
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const purchaseFired = useRef(false) // ✅ prevent double fire
 
   useEffect(() => {
     clearCart()
-
     if (!orderId) {
       setError("No order ID provided")
       setLoading(false)
       return
     }
-
     loadOrder()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
+
+  // ✅ Fire Purchase pixel event once order loads
+  useEffect(() => {
+    if (!order || purchaseFired.current) return
+    purchaseFired.current = true
+
+    const eventId = `purchase_${order.id}`
+
+    fbq(
+      'Purchase',
+      {
+        value: order.total,
+        currency: 'INR',
+        content_ids: order.items.map(i => String(i.product_id)),
+        content_type: 'product',
+        num_items: order.items.reduce((sum, i) => sum + i.quantity, 0),
+        order_id: order.order_number,
+      },
+      { eventID: eventId }
+    )
+  }, [order])
 
   const loadOrder = async () => {
     try {
@@ -52,7 +73,6 @@ export default function OrderSuccessClient() {
     const today = new Date()
     const deliveryDate = new Date(today)
     deliveryDate.setDate(today.getDate() + 7)
-
     return deliveryDate.toLocaleDateString("en-IN", {
       weekday: "long",
       year: "numeric",
@@ -99,29 +119,20 @@ export default function OrderSuccessClient() {
             <CheckCircle className="w-12 h-12 text-green-500" />
           </div>
           <h1 className="text-4xl font-bold mb-4">Order Confirmed!</h1>
-          <p className="text-xl text-green-50 mb-2">
-            Thank you for your purchase
-          </p>
-          <p className="text-green-100">
-            Your order has been successfully placed and is being processed
-          </p>
+          <p className="text-xl text-green-50 mb-2">Thank you for your purchase</p>
+          <p className="text-green-100">Your order has been successfully placed and is being processed</p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Order Details */}
         <div className="bg-white border border-border rounded-xl shadow-sm p-8 mb-6">
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             <div>
-              <h2 className="text-sm font-medium text-muted-foreground mb-2">
-                Order Number
-              </h2>
+              <h2 className="text-sm font-medium text-muted-foreground mb-2">Order Number</h2>
               <p className="text-2xl font-bold">#{order.order_number}</p>
             </div>
             <div>
-              <h2 className="text-sm font-medium text-muted-foreground mb-2">
-                Order Date
-              </h2>
+              <h2 className="text-sm font-medium text-muted-foreground mb-2">Order Date</h2>
               <p className="text-lg font-semibold">
                 {new Date(order.created_at!).toLocaleDateString("en-IN", {
                   year: "numeric",
@@ -140,22 +151,15 @@ export default function OrderSuccessClient() {
                 <Calendar className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-blue-900 mb-1">
-                  Estimated Delivery
-                </h3>
-                <p className="text-blue-700 font-medium">
-                  {getEstimatedDelivery()}
-                </p>
-                <p className="text-sm text-blue-600 mt-1">
-                  Usually delivered in 5–7 business days
-                </p>
+                <h3 className="font-semibold text-blue-900 mb-1">Estimated Delivery</h3>
+                <p className="text-blue-700 font-medium">{getEstimatedDelivery()}</p>
+                <p className="text-sm text-blue-600 mt-1">Usually delivered in 5–7 business days</p>
               </div>
             </div>
           </div>
 
           <div className="border-t border-border pt-6">
             <h3 className="text-lg font-bold mb-4">Order Summary</h3>
-
             <div className="space-y-4 mb-6">
               {order.items.map((item, index) => (
                 <div key={index} className="flex gap-4">
@@ -169,8 +173,7 @@ export default function OrderSuccessClient() {
                   <div className="flex-1">
                     <h4 className="font-semibold">{item.product_name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Size: {item.size} | Color: {item.color} | Qty:{" "}
-                      {item.quantity}
+                      Size: {item.size} | Color: {item.color} | Qty: {item.quantity}
                     </p>
                   </div>
                   <div className="text-right font-semibold">
@@ -182,7 +185,6 @@ export default function OrderSuccessClient() {
           </div>
         </div>
 
-        {/* Shipping Address */}
         <div className="bg-white border border-border rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="bg-purple-100 p-2 rounded-lg">
@@ -190,28 +192,22 @@ export default function OrderSuccessClient() {
             </div>
             <h3 className="text-lg font-bold">Shipping Address</h3>
           </div>
-
           <div className="text-sm space-y-1">
             <p className="font-semibold">
-              {order.shipping_address.first_name}{" "}
-              {order.shipping_address.last_name}
+              {order.shipping_address.first_name} {order.shipping_address.last_name}
             </p>
             <p>{order.shipping_address.phone}</p>
             <p className="mt-2">
               {order.shipping_address.address_line1}
-              {order.shipping_address.address_line2 &&
-                `, ${order.shipping_address.address_line2}`}
+              {order.shipping_address.address_line2 && `, ${order.shipping_address.address_line2}`}
             </p>
             <p>
-              {order.shipping_address.city},{" "}
-              {order.shipping_address.state}{" "}
-              {order.shipping_address.postal_code}
+              {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}
             </p>
             <p>{order.shipping_address.country}</p>
           </div>
         </div>
 
-        {/* Actions */}
         <div className="grid sm:grid-cols-2 gap-4">
           <Link
             href={`/orders/${order.id}`}
@@ -221,7 +217,6 @@ export default function OrderSuccessClient() {
             Track Order
             <ArrowRight className="w-5 h-5" />
           </Link>
-
           <Link
             href="/products"
             className="flex items-center justify-center gap-2 px-6 py-4 border border-border rounded-lg hover:bg-muted font-semibold"
