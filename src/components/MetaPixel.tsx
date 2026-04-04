@@ -1,3 +1,5 @@
+// src/components/MetaPixel.tsx
+
 'use client'
 
 import Script from "next/script"
@@ -9,7 +11,8 @@ const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
 
 export default function MetaPixel() {
   const pathname = usePathname()
- useEffect(() => {
+
+  useEffect(() => {
     if (!META_PIXEL_ID) return
     fbq('PageView')
   }, [pathname])
@@ -19,7 +22,7 @@ export default function MetaPixel() {
   return (
     <>
       <Script
-        id="meta-pixel"
+        id="meta-pixel-init"
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
@@ -40,25 +43,27 @@ export default function MetaPixel() {
               s.parentNode.insertBefore(t,s);
             }(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
 
-            // INIT WITH HARD DISABLE AUTO CONFIG
-            fbq('init', '${META_PIXEL_ID}', {}, {
-              autoConfig: false
-            });
-
-            // 🔥 BLOCK AUTO-DETECTED PURCHASE EVENTS
-            (function() {
-              var originalFbq = window.fbq;
-              window.fbq = function() {
-                // Block ONLY auto Purchase (no params = auto detected)
-                if (arguments[0] === 'track' && arguments[1] === 'Purchase' && arguments.length <= 2) {
-                  console.warn('Blocked AUTO Purchase event', arguments);
-                  return;
-                }
-                return originalFbq.apply(this, arguments);
-              };
-            })();
-
+            fbq('init', '${META_PIXEL_ID}', {}, { autoConfig: false });
           `,
+        }}
+      />
+
+      <Script
+        id="meta-pixel-purchase-guard"
+        strategy="afterInteractive"
+        src="https://connect.facebook.net/en_US/fbevents.js"
+        onLoad={() => {
+          // ✅ Wrap AFTER the real SDK is loaded — originalFbq is now the real function
+          const originalFbq = window.fbq
+          window.fbq = function(...args: Parameters<typeof originalFbq>) {
+            if (args[0] === 'track' && args[1] === 'Purchase' && args.length <= 2) {
+              console.warn('Blocked AUTO Purchase event', args)
+              return
+            }
+            return originalFbq.apply(window, args)
+          }
+          // Copy over all properties the FB SDK set on the original
+          Object.assign(window.fbq, originalFbq)
         }}
       />
 
