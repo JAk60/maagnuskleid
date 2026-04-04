@@ -9,8 +9,8 @@ const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
 
 export default function MetaPixel() {
   const pathname = usePathname()
-  
- useEffect(() => {
+
+  useEffect(() => {
     if (!META_PIXEL_ID) return
     fbq('PageView')
   }, [pathname])
@@ -24,45 +24,20 @@ export default function MetaPixel() {
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
-            !function(f,b,e,v,n,t,s){
-              if(f.fbq)return;
-              n=f.fbq=function(){
-                n.callMethod ? n.callMethod.apply(n,arguments) : n.queue.push(arguments)
-              };
-              if(!f._fbq)f._fbq=n;
-              n.push=n;
-              n.loaded=!0;
-              n.version='2.0';
-              n.queue=[];
-              t=b.createElement(e);
-              t.async=!0;
-              t.src=v;
-              s=b.getElementsByTagName(e)[0];
-              s.parentNode.insertBefore(t,s);
-            }(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
-
-            // INIT WITH HARD DISABLE AUTO CONFIG
-            fbq('init', '${META_PIXEL_ID}', {}, {
-              autoConfig: false
-            });
-
-            // 🔥 BLOCK AUTO-DETECTED PURCHASE EVENTS
-            (function() {
-              var originalFbq = window.fbq;
-              window.fbq = function() {
-                // Block ONLY auto Purchase (no params = auto detected)
-                if (arguments[0] === 'track' && arguments[1] === 'Purchase' && arguments.length <= 2) {
-                  console.warn('Blocked AUTO Purchase event', arguments);
-                  return;
-                }
-                return originalFbq.apply(this, arguments);
-              };
-            })();
-
+            !function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('set', 'autoConfig', false, '${META_PIXEL_ID}');
+            fbq('init', '${META_PIXEL_ID}');
+            fbq('track', 'PageView');
           `,
         }}
       />
-
       <noscript>
         <img
           height="1"
