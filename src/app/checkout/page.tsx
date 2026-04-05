@@ -171,10 +171,17 @@ export default function CheckoutPage() {
   // =====================
 
   const handleApplyCoupon = async (code: string, method?: PaymentMethod) => {
+
     const codeToApply = code.trim().toUpperCase()
     if (!codeToApply) { setCouponError("Please enter a coupon code"); return }
     if (!user) { setCouponError("Please log in to apply a coupon"); return }
 
+    console.log("Coupon payload:", {
+      code: codeToApply,
+      user_id: user?.id,
+      cart_total: total,
+      payment_method: method ?? paymentMethod,
+    })
     setCouponLoading(true)
     setCouponError("")
     setCouponSuccess("")

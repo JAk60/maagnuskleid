@@ -118,3 +118,26 @@ export async function searchProducts(query: string): Promise<Product[]> {
   if (error) throw error;
   return (data || []).map(normalizeProduct);
 }
+
+
+export async function getProductById(id: number): Promise<Product | null> {
+  const { data, error } = await supabase
+    .from("products")
+    .select(
+      `
+      *,
+      category_obj:categories(id, name, slug, gender),
+      images:product_images(image_url, display_order, is_primary),
+      size_chart:size_charts(size, chest, length, bust, length_female, notes)
+    `
+    )
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return data as unknown as Product;
+}

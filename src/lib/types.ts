@@ -1,5 +1,8 @@
 // lib/types.ts
 
+/* =========================
+   SIZE CHART
+========================= */
 export interface SizeChartEntry {
   id?: string;
   product_id?: number;
@@ -11,10 +14,14 @@ export interface SizeChartEntry {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+
+  // Allow extra dynamic fields safely
   [key: string]: string | number | undefined;
 }
 
-// Add this new interface above Product
+/* =========================
+   PRODUCT IMAGES
+========================= */
 export interface ProductImage {
   id: string;
   product_id: number;
@@ -24,60 +31,102 @@ export interface ProductImage {
   created_at: string;
 }
 
+/* =========================
+   CATEGORY TYPES
+========================= */
+export interface CategoryObj {
+  id: string;
+  name: string;
+  slug: string;
+  gender: "Male" | "Female" | "Unisex";
+}
+
+export interface Category {
+  name: string;
+  slug: string;
+  gender: "Male" | "Female";
+  count?: number;
+}
+
+export const CATEGORIES = {
+  Male: ["Oversized tshirt", "Jersey", "Sweatshirt", "Shirts", "Sweatpants"],
+  Female: [
+    "Baby tees",
+    "Jersey",
+    "Oversized tshirt",
+    "Shirts",
+    "Sweatshirts",
+    "Sweatpants",
+    "Flared pants",
+  ],
+} as const;
+
+export const ALL_SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
+
+/* =========================
+   PRODUCT
+========================= */
 export interface Product {
-  size_chart: SizeChartEntry[];
-  has_size_chart: boolean;
   id: number;
   name: string;
-  description: string;
+  description?: string;
   price: number;
-  image_url: string;
-  images?: ProductImage[];  // ← was string[], now the real shape
+
+  // Primary image (legacy)
+  image_url: string | null;
+
+  // Legacy text category (DO NOT USE for filtering)
   category: string;
+
+  // FK to categories table (USE THIS)
+  category_id: string | null;
+
+  // Joined category object
+  category_obj?: CategoryObj | null;
+
   sizes: string[];
-  colors: (string | { name?: string; hex: string })[];  // ← fix this too, your card already handles both but the type said string[]
+
+  // Support both string and structured color
+  colors: (string | { name: string; hex: string })[];
+
   stock: number;
+  gender: string;
+
   created_at: string;
   updated_at?: string;
-  gender: "Male" | "Female";
+
+  // Multiple images support
+  images?: (string | { image_url: string })[];
+
   slug?: string;
-  // extras from real data
-  category_id?: number | null;
+
+  // Size chart
+  has_size_chart?: boolean;
+  size_chart?: SizeChartEntry[];
+
+  // Shipping / logistics
   weight?: number;
   length?: number;
   breadth?: number;
   height?: number;
+
   sku?: string;
 }
+
+/* =========================
+   FILTER STATE
+========================= */
 export interface FilterState {
-	gender: string[];
-	categories: string[];
-	priceRange: [number, number];
-	sizes: string[];
-	colors: string[];
-	inStock: boolean;
-	searchQuery: string;
-	sortBy: "price-asc" | "price-desc" | "newest" | "name";
+  gender: string[];
+
+  // IMPORTANT: stores category_id (UUID), not name
+  categories: string[];
+
+  priceRange: [number, number];
+  sizes: string[];
+  colors: string[];
+  inStock: boolean;
+  searchQuery: string;
+
+  sortBy: "newest" | "price-asc" | "price-desc" | "name";
 }
-
-export interface Category {
-	name: string;
-	slug: string;
-	gender: "Male" | "Female";
-	count?: number;
-}
-
-export const CATEGORIES = {
-	Male: ["Oversized tshirt", "Jersey", "Sweatshirt", "Shirts", "Sweatpants"],
-	Female: [
-		"Baby tees",
-		"Jersey",
-		"Oversized tshirt",
-		"Shirts",
-		"Sweatshirts",
-		"Sweatpants",
-		"Flared pants",
-	],
-};
-
-export const ALL_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];

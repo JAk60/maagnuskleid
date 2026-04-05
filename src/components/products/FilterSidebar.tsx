@@ -1,9 +1,10 @@
-// components/products/FilterSidebar.tsx - FINAL VERSION
+// src/components/products/FilterSidebar.tsx
+// FilterSidebar now receives CategoryObj[] so it can filter by category_id (UUID)
+// instead of by category name string.
 
-'use client';
+"use client";
 
-import { FilterState, ALL_SIZES } from '@/lib/types';
-import { X } from 'lucide-react';
+import { FilterState, CategoryObj } from "@/lib/types";
 
 interface FilterSidebarProps {
   filters: FilterState;
@@ -11,20 +12,9 @@ interface FilterSidebarProps {
   availableColors: (string | { name: string; hex: string })[];
   priceRange: [number, number];
   onReset: () => void;
-  availableCategories?: string[]; // NEW: Optional prop for dynamic categories
+  // Now CategoryObj[] instead of string[]
+  availableCategories?: CategoryObj[];
 }
-
-// Helper function to get color hex value
-const getColorHex = (color: string | { name?: string; hex: string }): string => {
-  if (typeof color === 'string') {
-    // Old format: string color
-    return color.toLowerCase() === 'white' ? '#ffffff' : color.toLowerCase();
-  } else if (color && typeof color === 'object' && color.hex) {
-    // New format: {name, hex}
-    return color.hex;
-  }
-  return '#000000'; // fallback
-};
 
 export default function FilterSidebar({
   filters,
@@ -32,37 +22,54 @@ export default function FilterSidebar({
   availableColors,
   priceRange,
   onReset,
-  availableCategories // NEW
+  availableCategories = [],
 }: FilterSidebarProps) {
-
-  const handleGenderChange = (gender: string) => {
-    const newGenders = filters.gender.includes(gender)
-      ? filters.gender.filter(g => g !== gender)
-      : [...filters.gender, gender];
-    onChange({ ...filters, gender: newGenders, categories: [] });
+  const toggleCategory = (categoryId: string) => {
+    const current = filters.categories;
+    const updated = current.includes(categoryId)
+      ? current.filter((c) => c !== categoryId)
+      : [...current, categoryId];
+    onChange({ ...filters, categories: updated });
   };
 
-  const handleCategoryChange = (category: string) => {
-    const newCategories = filters.categories.includes(category)
-      ? filters.categories.filter(c => c !== category)
-      : [...filters.categories, category];
-    onChange({ ...filters, categories: newCategories });
+  const toggleGender = (gender: string) => {
+    const current = filters.gender;
+    const updated = current.includes(gender)
+      ? current.filter((g) => g !== gender)
+      : [...current, gender];
+    onChange({ ...filters, gender: updated });
   };
 
-  const handleSizeChange = (size: string) => {
-    const newSizes = filters.sizes.includes(size)
-      ? filters.sizes.filter(s => s !== size)
-      : [...filters.sizes, size];
-    onChange({ ...filters, sizes: newSizes });
+  const toggleSize = (size: string) => {
+    const current = filters.sizes;
+    const updated = current.includes(size)
+      ? current.filter((s) => s !== size)
+      : [...current, size];
+    onChange({ ...filters, sizes: updated });
   };
 
-  const handleColorChange = (color: string | { name: string; hex: string }) => {
-    const colorValue = typeof color === 'string' ? color : color.name || color.hex;
-    const newColors = filters.colors.includes(colorValue)
-      ? filters.colors.filter(c => c !== colorValue)
-      : [...filters.colors, colorValue];
-    onChange({ ...filters, colors: newColors });
+  const toggleColor = (colorKey: string) => {
+    const current = filters.colors;
+    const updated = current.includes(colorKey)
+      ? current.filter((c) => c !== colorKey)
+      : [...current, colorKey];
+    onChange({ ...filters, colors: updated });
   };
+
+  const getColorKey = (color: string | { name: string; hex: string }): string =>
+    typeof color === "string" ? color : color.name;
+
+  const getColorHex = (color: string | { name: string; hex: string }): string =>
+    typeof color === "string"
+      ? color.toLowerCase() === "white"
+        ? "#ffffff"
+        : color.toLowerCase()
+      : color.hex;
+
+  const getColorName = (color: string | { name: string; hex: string }): string =>
+    typeof color === "string" ? color : color.name;
+
+  const commonSizes = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
 
   const hasActiveFilters =
     filters.gender.length > 0 ||
@@ -70,99 +77,104 @@ export default function FilterSidebar({
     filters.sizes.length > 0 ||
     filters.colors.length > 0 ||
     filters.inStock ||
-    filters.priceRange[0] !== priceRange[0] ||
-    filters.priceRange[1] !== priceRange[1];
+    filters.priceRange[0] > priceRange[0] ||
+    filters.priceRange[1] < priceRange[1];
 
   return (
-    <div className="bg-[#E3D9C6] w-full space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Filters</h2>
-        {hasActiveFilters && (
-          <button
-            onClick={onReset}
-            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
-          >
-            <X className="w-4 h-4" />
-            Clear all
-          </button>
-        )}
+    <div className="space-y-6">
+      {/* Reset */}
+      {hasActiveFilters && (
+        <button
+          onClick={onReset}
+          className="w-full text-sm text-red-600 hover:text-red-700 font-medium text-left"
+        >
+          Clear all filters
+        </button>
+      )}
+
+      {/* Gender */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-gray-700">
+          Gender
+        </h3>
+        <div className="space-y-2">
+          {["Male", "Female"].map((g) => (
+            <label key={g} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.gender.includes(g)}
+                onChange={() => toggleGender(g)}
+                className="w-4 h-4 accent-gray-900"
+              />
+              <span className="text-sm">{g === "Male" ? "Mens" : "Womens"}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
-      {/* Gender Filter - Only show if not pre-filtered */}
-      {(!filters.gender.length || filters.gender.length < 2) && (
-        <div className="border-b pb-6">
-          <h3 className="font-medium mb-3">Gender</h3>
+      {/* Categories — only shown when categories are available */}
+      {availableCategories.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-gray-700">
+            Category
+          </h3>
           <div className="space-y-2">
-            {['Male', 'Female'].map(gender => (
-              <label key={gender} className="flex items-center gap-2 cursor-pointer">
+            {availableCategories.map((cat) => (
+              <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={filters.gender.includes(gender)}
-                  onChange={() => handleGenderChange(gender)}
-                  className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                  checked={filters.categories.includes(cat.id)}
+                  onChange={() => toggleCategory(cat.id)}
+                  className="w-4 h-4 accent-gray-900"
                 />
-                <span className="text-sm">{gender === 'Male' ? 'Mens' : 'Womens'}</span>
+                <span className="text-sm">{cat.name}</span>
               </label>
             ))}
           </div>
         </div>
       )}
 
-      {/* Category Filter - Use dynamic categories if provided */}
-      {availableCategories && availableCategories.length > 0 && (
-        <div className="border-b pb-6">
-          <h3 className="font-medium mb-3">Category</h3>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {availableCategories.map((category) => (
-              <label key={category} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.categories.includes(category)}
-                  onChange={() => handleCategoryChange(category)}
-                  className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                />
-                <span className="text-sm">{category}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Price Range Filter */}
-      <div className="border-b pb-6">
-        <h3 className="font-medium mb-3">Price Range</h3>
+      {/* Price range */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-gray-700">
+          Price
+        </h3>
         <div className="space-y-3">
           <input
             type="range"
             min={priceRange[0]}
             max={priceRange[1]}
             value={filters.priceRange[1]}
-            onChange={(e) => onChange({
-              ...filters,
-              priceRange: [priceRange[0], Number(e.target.value)]
-            })}
-            className="w-full"
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                priceRange: [filters.priceRange[0], Number(e.target.value)],
+              })
+            }
+            className="w-full accent-gray-900"
           />
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>₹{priceRange[0]}</span>
-            <span>₹{filters.priceRange[1]}</span>
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>₹{filters.priceRange[0].toLocaleString("en-IN")}</span>
+            <span>₹{filters.priceRange[1].toLocaleString("en-IN")}</span>
           </div>
         </div>
       </div>
 
-      {/* Size Filter */}
-      <div className="border-b pb-6">
-        <h3 className="font-medium mb-3">Sizes</h3>
+      {/* Sizes */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-gray-700">
+          Size
+        </h3>
         <div className="flex flex-wrap gap-2">
-          {ALL_SIZES.map(size => (
+          {commonSizes.map((size) => (
             <button
               key={size}
-              onClick={() => handleSizeChange(size)}
-              className={`px-3 py-1.5 text-sm border rounded-md transition-colors ₹{filters.sizes.includes(size)
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
-                }`}
+              onClick={() => toggleSize(size)}
+              className={`px-3 py-1.5 text-sm border rounded-lg transition-all ${
+                filters.sizes.includes(size)
+                  ? "bg-gray-900 text-white border-gray-900"
+                  : "border-gray-300 hover:border-gray-900"
+              }`}
             >
               {size}
             </button>
@@ -170,44 +182,52 @@ export default function FilterSidebar({
         </div>
       </div>
 
-      {/* Color Filter */}
-      <div className="border-b pb-6">
-        <h3 className="font-medium mb-3">Colors</h3>
-        <div className="flex flex-wrap gap-2">
-          {availableColors.map((color, idx) => {
-            const colorValue = typeof color === 'string' ? color : color.name || color.hex;
-            const colorHex = getColorHex(color);
-            
-            return (
-              <button
-                key={`color-₹{colorValue}-₹{idx}`}
-                onClick={() => handleColorChange(color)}
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md transition-colors ₹{filters.colors.includes(colorValue)
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-[#E3D9C6] text-gray-900 border-gray-300 hover:border-gray-900'
-                  }`}
-              >
-                <div
-                  className="w-4 h-4 rounded-full border border-gray-300"
-                  style={{ backgroundColor: colorHex }}
-                />
-                {colorValue}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Colors */}
+      {availableColors.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-gray-700">
+            Color
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {availableColors.map((color) => {
+              const key = getColorKey(color);
+              const hex = getColorHex(color);
+              const name = getColorName(color);
+              const isSelected = filters.colors.includes(key);
 
-      {/* Stock Filter */}
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleColor(key)}
+                  title={name}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 text-xs border rounded-lg transition-all ${
+                    isSelected
+                      ? "border-gray-900 ring-1 ring-gray-900"
+                      : "border-gray-300 hover:border-gray-900"
+                  }`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
+                    style={{ backgroundColor: hex }}
+                  />
+                  <span>{name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* In stock */}
       <div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={filters.inStock}
             onChange={(e) => onChange({ ...filters, inStock: e.target.checked })}
-            className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+            className="w-4 h-4 accent-gray-900"
           />
-          <span className="text-sm">In stock only</span>
+          <span className="text-sm font-medium">In stock only</span>
         </label>
       </div>
     </div>
