@@ -15,25 +15,44 @@ interface ProductCardProps {
   index?: number;
 }
 
+type ImageType =
+  | string
+  | {
+      image_url: string;
+      display_order?: number;
+    };
+
+function normalizeImages(images: ImageType[]): string[] {
+  return images
+    .map((img) =>
+      typeof img === 'string'
+        ? { image_url: img, display_order: 0 }
+        : {
+            image_url: img.image_url,
+            display_order: img.display_order ?? 0,
+          }
+    )
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((img) => img.image_url);
+}
+
 export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const { addItem } = useCart();
   const slug = generateSlug(product.name);
   const isOutOfStock = product.stock === 0;
 
   const [selectedSize, setSelectedSize] = useState<string>(
-    product.sizes[0] || ''
+    product.sizes?.[0] || ''
   );
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  // ✅ Only 2 images (performance optimized)
+  // ✅ FIXED: safe image normalization
   const sortedImages =
     product.images && product.images.length > 0
-      ? [...product.images]
-          .sort((a, b) => a.display_order - b.display_order)
-          .map((img) => img.image_url)
+      ? normalizeImages(product.images as ImageType[])
       : [product.image_url || '/placeholder-product.jpg'];
 
   const firstImage = sortedImages[0];
@@ -53,7 +72,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   };
 
   const getFirstColorForCart = (): string => {
-    const firstColor = product.colors[0];
+    const firstColor = product.colors?.[0];
     if (typeof firstColor === 'string') return firstColor;
     return firstColor?.hex || '#000';
   };
@@ -113,7 +132,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
       {/* IMAGE */}
       <Link href={`/products/${slug}`}>
         <div
-          className="relative aspect-3/4 overflow-hidden rounded-xl mb-4 bg-[#f3f3f3] contain-[layout_paint]"
+          className="relative aspect-3/4 overflow-hidden rounded-xl mb-4 bg-[#f3f3f3]"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -131,7 +150,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
             fill
             priority={index < 4}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transform-gpu will-change-transform transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
             onLoadingComplete={() => setLoaded(true)}
           />
 
@@ -141,7 +160,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
               src={secondImage}
               alt="hover"
               fill
-              className={`object-cover absolute inset-0 transform-gpu will-change-transform transition-all duration-200 group-hover:scale-105 ${
+              className={`object-cover absolute inset-0 transition-all duration-200 ${
                 activeImageIndex === 1 ? 'opacity-100' : 'opacity-0'
               }`}
             />
@@ -178,7 +197,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
 
       {/* COLORS */}
       <div className="flex gap-2 mb-3">
-        {product.colors.slice(0, 5).map((color, i) => (
+        {product.colors?.slice(0, 5).map((color, i) => (
           <div
             key={i}
             className="w-5 h-5 rounded-full border"
@@ -189,7 +208,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
 
       {/* SIZES */}
       <div className="flex flex-wrap gap-2 mb-3">
-        {product.sizes.map((size) => (
+        {product.sizes?.map((size) => (
           <button
             key={size}
             onClick={(e) => {
